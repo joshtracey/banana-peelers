@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Banana Peelers</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Coach selection modal -->
+  <div id="coach-modal" class="modal-overlay">
+    <div class="modal coach-modal">
+      <div class="coach-modal-logo">🍌</div>
+      <h1>Banana Peelers</h1>
+      <p>Who are you?</p>
+      <button class="btn-coach" data-coach="Coach1">Josh (Coach 1)</button>
+      <button class="btn-coach" data-coach="Coach2">Co-Coach (Coach 2)</button>
+    </div>
+  </div>
+
+  <!-- Reflection modal -->
+  <div id="reflection-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Game Reflections</h2>
+        <button class="modal-close" onclick="closeModal('reflection-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Your Notes</label>
+        <textarea id="reflection-text" class="form-textarea" placeholder="How did the game go? What worked?"></textarea>
+        <label class="form-label" style="margin-top:16px">Line Notes (optional)</label>
+        <div id="line-notes-container"></div>
+        <label class="form-label" style="margin-top:16px">Stats URL</label>
+        <input type="url" id="stats-url-input" class="form-input" placeholder="https://saintjohnballhockey.com/results/...">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveReflection()">Save Reflection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Copy forward modal -->
+  <div id="copy-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Start Game</h2>
+        <button class="modal-close" onclick="closeModal('copy-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="copy-modal-message"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="startFresh()">Start Fresh</button>
+        <button class="btn btn-primary" id="copy-forward-btn" onclick="copyForward()">Copy Lines</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add line modal -->
+  <div id="add-line-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add 4th Line?</h2>
+        <button class="modal-close" onclick="closeModal('add-line-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Add a 4th line if you have extra players.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('add-line-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="addLine()">Add Line</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game select modal (for History retroactive) -->
+  <div id="retroactive-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Add Lines Retroactively</h2>
+        <button class="modal-close" onclick="closeModal('retroactive-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Enter attendance and lines for this past game. This will be marked as a retroactive entry.</p>
+        <p id="retroactive-game-info" class="retroactive-label"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="openRetroactive()">Open Line Builder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main app (hidden until coach selected) -->
+  <div id="app" class="hidden">
+
+    <!-- Header -->
+    <header class="app-header">
+      <span class="app-title">🍌 Banana Peelers</span>
+      <span id="sync-status" class="sync-status">Loading...</span>
+    </header>
+
+    <!-- Tab panels -->
+    <main class="tab-content">
+
+      <div id="tab-today" class="tab-panel active">
+        <div id="today-content">
+          <div class="loading-state">Loading schedule...</div>
+        </div>
+      </div>
+
+      <div id="tab-history" class="tab-panel">
+        <div id="history-content">
+          <div class="loading-state">Loading history...</div>
+        </div>
+      </div>
+
+      <div id="tab-roster" class="tab-panel">
+        <div id="roster-content">
+          <div class="loading-state">Loading roster...</div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="today" onclick="switchTab('today')">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Today</span>
+      </button>
+      <button class="nav-btn" data-tab="history" onclick="switchTab('history')">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">History</span>
+      </button>
+      <button class="nav-btn" data-tab="roster" onclick="switchTab('roster')">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Roster</span>
+      </button>
+    </nav>
+
+    <!-- FAB -->
+    <button id="save-fab" class="fab hidden" onclick="saveSnapshot()">
+      💾 Save Snapshot
+    </button>
+
+  </div>
+
+  <script src="js/sync.js"></script>
+  <script src="js/roster.js"></script>
+  <script src="js/lines.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
