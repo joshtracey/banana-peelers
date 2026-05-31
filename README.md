@@ -8,9 +8,6 @@ Mobile-first web app for managing ball hockey lines collaboratively.
 
 ## Apps Script Setup
 
-### One-time: enable Drive API
-In the Apps Script editor, click **Services** (the + icon in the left sidebar) → search **Drive API** → Add. This lets the script convert PDFs to text for game sheet import.
-
 ### Full script — paste this, replacing all existing code, then re-deploy
 
 Re-deploy: **Deploy → Manage deployments → edit (pencil) → New version → Deploy**
@@ -85,16 +82,55 @@ function parseGameSheet(gameNo) {
 }
 
 function pdfToText(blob) {
-  // Upload PDF to Drive as a Google Doc (converts automatically), extract text, delete.
-  const file = Drive.Files.create(
-    { name: '_bp_temp_' + Date.now(), mimeType: 'application/vnd.google-apps.document' },
-    blob
+  // Upload PDF to Drive via REST API (no Advanced Service needed).
+  // DriveApp call below is intentional — it ensures the drive scope is granted to this script.
+  const token = ScriptApp.getOAuthToken();
+  DriveApp.getRootFolder(); // triggers drive scope
+
+  const boundary = 'bp_boundary_' + Date.now();
+  const metadata = JSON.stringify({
+    name: '_bp_gs_tmp_' + Date.now(),
+    mimeType: 'application/vnd.google-apps.document'
+  });
+  const pdfBase64 = Utilities.base64Encode(blob.getBytes());
+
+  const body = [
+    '--' + boundary,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    metadata,
+    '--' + boundary,
+    'Content-Type: application/pdf',
+    'Content-Transfer-Encoding: base64',
+    '',
+    pdfBase64,
+    '--' + boundary + '--'
+  ].join('\r\n');
+
+  const uploadResp = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'multipart/related; boundary=' + boundary
+      },
+      payload: body,
+      muteHttpExceptions: true
+    }
   );
+
+  const fileId = JSON.parse(uploadResp.getContentText()).id;
+  if (!fileId) return null;
+
   try {
-    const doc = DocumentApp.openById(file.id);
-    return doc.getBody().getText();
+    const textResp = UrlFetchApp.fetch(
+      'https://docs.google.com/document/d/' + fileId + '/export?format=txt',
+      { headers: { 'Authorization': 'Bearer ' + token }, muteHttpExceptions: true }
+    );
+    return textResp.getContentText();
   } finally {
-    try { DriveApp.getFileById(file.id).setTrashed(true); } catch(e) {}
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch(e) {}
   }
 }
 
