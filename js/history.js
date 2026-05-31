@@ -133,13 +133,13 @@ const History = {
       html += `<hr class="divider"><div class="section-title" style="margin-bottom:8px">Reflections</div>`;
       if (c1) html += `
         <div class="reflection-block">
-          <div class="reflection-coach-label">Coach 1 (Josh)</div>
+          <div class="reflection-coach-label">Coach 1 (Russell)</div>
           <div class="reflection-text">${escHtml(c1)}</div>
           ${lineNotes1 ? `<div class="reflection-text" style="margin-top:6px;font-style:italic">${escHtml(lineNotes1)}</div>` : ''}
         </div>`;
       if (c2) html += `
         <div class="reflection-block">
-          <div class="reflection-coach-label">Coach 2</div>
+          <div class="reflection-coach-label">Coach 2 (Josh)</div>
           <div class="reflection-text">${escHtml(c2)}</div>
           ${lineNotes2 ? `<div class="reflection-text" style="margin-top:6px;font-style:italic">${escHtml(lineNotes2)}</div>` : ''}
         </div>`;

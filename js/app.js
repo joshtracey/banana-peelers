@@ -184,7 +184,7 @@ function renderTodayTab() {
 
   html += `<div style="height:24px"></div>
     <div class="text-muted" style="text-align:center;font-size:12px">
-      Signed in as ${STATE.coach === 'Coach1' ? 'Josh (Coach 1)' : 'Coach 2'} ·
+      Signed in as ${STATE.coach === 'Coach1' ? 'Russell (Coach 1)' : 'Josh (Coach 2)'} ·
       <button style="color:var(--navy);font-size:12px;text-decoration:underline" onclick="switchCoach()">Switch</button>
     </div>`;
 
@@ -254,7 +254,7 @@ function renderGameManagement(game) {
         onchange="updateOpponent('${game.id}', this.value)">
       <div class="game-meta">
         <span>${game.venue}</span>
-        <span>${STATE.coach === 'Coach1' ? 'Josh' : 'Coach 2'}</span>
+        <span>${STATE.coach === 'Coach1' ? 'Russell' : 'Josh'}</span>
       </div>
     </div>
 
