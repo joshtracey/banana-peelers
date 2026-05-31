@@ -1,66 +1,37 @@
-# Banana Peelers Line Manager
-
-Mobile-first web app for managing ball hockey lines collaboratively.
-
-**Live app:** https://joshtracey.github.io/banana-peelers
-
----
-
-## Apps Script Setup
-
-### Paste the script — then re-deploy
-
-Re-deploy: **Deploy → Manage deployments → edit (pencil) → New version → Deploy**
-
-The script lives in [`Code.gs`](Code.gs) in this repo. To update Apps Script:
-
-1. Open the file: https://github.com/joshtracey/banana-peelers/blob/main/Code.gs
-2. Click the **Raw** button (top-right of the file view)
-3. Select All (`Cmd+A`) → Copy (`Cmd+C`)
-4. In Apps Script editor: select all existing code and paste
-5. Save (`Cmd+S`) then re-deploy
-
-> **Important:** Always use the Raw view. Never copy from the rendered GitHub page — it may include formatting that breaks the script.
-
----
-
-The full script source (for reference — copy from Raw, not here):
-
-```javascript
 // Config
-const TEAM_NAME = 'Yellow U11';
+var TEAM_NAME = 'Yellow U11';
 
-// ── Web endpoints ──
+// Web endpoints
 
 function doGet(e) {
-  const action = e && e.parameter && e.parameter.action;
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var action = e && e.parameter && e.parameter.action;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   if (action === 'getAll') {
-    const gamesSheet = ss.getSheetByName('Games');
-    const games = sheetToObjects(gamesSheet).map(rowToGame);
-    return jsonResponse({ games });
+    var gamesSheet = ss.getSheetByName('Games');
+    var games = sheetToObjects(gamesSheet).map(rowToGame);
+    return jsonResponse({ games: games });
   }
 
   return jsonResponse({ status: 'ok' });
 }
 
 function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  var data = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   if (data.type === 'saveGame') {
     upsertGame(ss.getSheetByName('Games'), data.game);
   }
 
   if (data.type === 'saveLineChange') {
-    const sheet = ss.getSheetByName('LineChanges');
+    var sheet = ss.getSheetByName('LineChanges');
     sheet.appendRow([data.gameId, new Date().toISOString(), JSON.stringify(data.lines), data.coach]);
   }
 
   if (data.type === 'saveReflection') {
-    const sheet = ss.getSheetByName('Games');
-    updateGameColumns(sheet, data.gameId, {
+    var gsheet = ss.getSheetByName('Games');
+    updateGameColumns(gsheet, data.gameId, {
       ReflectionCoach1: data.coach === 'Coach1' ? data.reflection : undefined,
       ReflectionCoach2: data.coach === 'Coach2' ? data.reflection : undefined,
       LineNotesCoach1:  data.coach === 'Coach1' ? data.lineNotes  : undefined,
@@ -76,18 +47,18 @@ function doPost(e) {
   return jsonResponse({ status: 'ok' });
 }
 
-// ── Game sheet import ──
+// Game sheet import
 
 function parseGameSheet(gameNo) {
-  const url = 'https://saintjohnballhockey.com/shark_modules/modules/GameReports/GameSheet.php'
-            + '?site=1&lang=en&game_no=' + gameNo;
+  var url = 'https://saintjohnballhockey.com/shark_modules/modules/GameReports/GameSheet.php'
+          + '?site=1&lang=en&game_no=' + gameNo;
   try {
-    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
     if (resp.getResponseCode() !== 200) {
       return { error: 'Game sheet not found for game #' + gameNo };
     }
-    const blob = resp.getBlob().setName('bp_gs_' + gameNo + '.pdf');
-    const text = pdfToText(blob);
+    var blob = resp.getBlob().setName('bp_gs_' + gameNo + '.pdf');
+    var text = pdfToText(blob);
     if (!text) return { error: 'Could not extract text from game sheet.' };
     return parseGameSheetText(text, gameNo);
   } catch (err) {
@@ -96,19 +67,19 @@ function parseGameSheet(gameNo) {
 }
 
 function pdfToText(blob) {
-  // Upload PDF to Drive via REST API (no Advanced Service needed).
-  // DriveApp call below is intentional — it ensures the drive scope is granted to this script.
-  const token = ScriptApp.getOAuthToken();
-  DriveApp.getRootFolder(); // triggers drive scope
+  // Upload PDF to Drive REST API to convert it to a Google Doc, then export as text.
+  // DriveApp.getRootFolder() below is intentional: it triggers the Drive OAuth scope.
+  var token = ScriptApp.getOAuthToken();
+  DriveApp.getRootFolder();
 
-  const boundary = 'bp_boundary_' + Date.now();
-  const metadata = JSON.stringify({
+  var boundary = 'bp_boundary_' + Date.now();
+  var metadata = JSON.stringify({
     name: '_bp_gs_tmp_' + Date.now(),
     mimeType: 'application/vnd.google-apps.document'
   });
-  const pdfBase64 = Utilities.base64Encode(blob.getBytes());
+  var pdfBase64 = Utilities.base64Encode(blob.getBytes());
 
-  const body = [
+  var body = [
     '--' + boundary,
     'Content-Type: application/json; charset=UTF-8',
     '',
@@ -121,7 +92,7 @@ function pdfToText(blob) {
     '--' + boundary + '--'
   ].join('\r\n');
 
-  const uploadResp = UrlFetchApp.fetch(
+  var uploadResp = UrlFetchApp.fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
     {
       method: 'POST',
@@ -134,11 +105,11 @@ function pdfToText(blob) {
     }
   );
 
-  const fileId = JSON.parse(uploadResp.getContentText()).id;
+  var fileId = JSON.parse(uploadResp.getContentText()).id;
   if (!fileId) return null;
 
   try {
-    const textResp = UrlFetchApp.fetch(
+    var textResp = UrlFetchApp.fetch(
       'https://docs.google.com/document/d/' + fileId + '/export?format=txt',
       { headers: { 'Authorization': 'Bearer ' + token }, muteHttpExceptions: true }
     );
@@ -149,76 +120,75 @@ function pdfToText(blob) {
 }
 
 function parseGameSheetText(text, gameNo) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  // Find our team section
-  const teamIdx = lines.findIndex(l => l.includes(TEAM_NAME));
+  var teamIdx = lines.findIndex(function(l) { return l.includes(TEAM_NAME); });
   if (teamIdx === -1) {
     return { error: TEAM_NAME + ' not found in game sheet. Wrong game number?' };
   }
-  const teamLines = lines.slice(teamIdx + 1);
+  var teamLines = lines.slice(teamIdx + 1);
 
-  // Extract roster (players listed before "Support Staff")
-  const roster = [];
-  let pastHeader = false;
-  for (const line of teamLines) {
+  var roster = [];
+  var pastHeader = false;
+  for (var i = 0; i < teamLines.length; i++) {
+    var line = teamLines[i];
     if (/^#\s*Player/.test(line)) { pastHeader = true; continue; }
     if (!pastHeader) continue;
     if (/Support Staff|Team staff/i.test(line)) break;
-    const m = line.match(/^(\d+)\s+([A-Za-z]+(?: [A-Za-z]+)+)/);
+    var m = line.match(/^(\d+)\s+([A-Za-z]+(?: [A-Za-z]+)+)/);
     if (m) roster.push({ number: parseInt(m[1]), name: m[2].trim() });
   }
 
-  // Extract scoring (between "G A A Time Per." and "Suspensions")
-  const scoring = [];
-  let inScoring = false;
-  for (const line of teamLines) {
-    if (/G\s+A\s+A\s+Time/.test(line)) { inScoring = true; continue; }
+  var scoring = [];
+  var inScoring = false;
+  for (var j = 0; j < teamLines.length; j++) {
+    var tline = teamLines[j];
+    if (/G\s+A\s+A\s+Time/.test(tline)) { inScoring = true; continue; }
     if (!inScoring) continue;
-    if (/Suspension|Minor penalt|Major and|Goaltender/i.test(line)) break;
-    const goal = parseScoringLine(line);
+    if (/Suspension|Minor penalt|Major and|Goaltender/i.test(tline)) break;
+    var goal = parseScoringLine(tline);
     if (goal) scoring.push(goal);
   }
 
-  // Tally stats per jersey number
-  const map = {};
-  const add = (num, field) => {
+  var map = {};
+  function add(num, field) {
     if (!num) return;
     if (!map[num]) map[num] = { number: num, g: 0, a: 0, pts: 0 };
     map[num][field]++;
     map[num].pts++;
-  };
-  for (const goal of scoring) {
-    add(goal.scorer, 'g');
-    add(goal.assist1, 'a');
-    add(goal.assist2, 'a');
+  }
+  for (var k = 0; k < scoring.length; k++) {
+    add(scoring[k].scorer, 'g');
+    add(scoring[k].assist1, 'a');
+    add(scoring[k].assist2, 'a');
   }
 
   return {
     gameNo: parseInt(gameNo),
-    roster,
-    scoring,
+    roster: roster,
+    scoring: scoring,
     playerStats: Object.values(map),
     totalGoals: scoring.length
   };
 }
 
 function parseScoringLine(line) {
-  const tokens = line.trim().split(/\s+/);
-  const jerseys = [];
-  let time = null, period = null;
-  for (const t of tokens) {
-    if (/^\d+:\d+$/.test(t))             time = t;
+  var tokens = line.trim().split(/\s+/);
+  var jerseys = [];
+  var time = null, period = null;
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+    if (/^\d+:\d+$/.test(t))              time = t;
     else if (/^(P[123]|OT|SO)$/i.test(t)) period = t.toUpperCase();
     else if (/^\d+$/.test(t) && !time)    jerseys.push(parseInt(t));
   }
   if (!time || !period || jerseys.length === 0) return null;
-  return { scorer: jerseys[0], assist1: jerseys[1] || null, assist2: jerseys[2] || null, time, period };
+  return { scorer: jerseys[0], assist1: jerseys[1] || null, assist2: jerseys[2] || null, time: time, period: period };
 }
 
-// ── Games sheet helpers ──
+// Games sheet helpers
 
-const GAME_HEADERS = [
+var GAME_HEADERS = [
   'GameID','Date','Opponent','Time','Venue','Result','Completed',
   'IsActive','IsRetroactive','GoaliePresent','GoalieFillIn',
   'Attendance','Lines','FinalLines',
@@ -255,7 +225,7 @@ function rowToGame(row) {
 }
 
 function gameToRow(headers, game) {
-  return headers.map(h => {
+  return headers.map(function(h) {
     switch(h) {
       case 'GameID':          return game.id;
       case 'Date':            return game.date;
@@ -285,14 +255,14 @@ function gameToRow(headers, game) {
 }
 
 function upsertGame(sheet, game) {
-  const headers = ensureHeaders(sheet, GAME_HEADERS);
-  const data = sheet.getDataRange().getValues();
-  const idCol = headers.indexOf('GameID');
-  let rowIdx = -1;
-  for (let r = 1; r < data.length; r++) {
+  var headers = ensureHeaders(sheet, GAME_HEADERS);
+  var data = sheet.getDataRange().getValues();
+  var idCol = headers.indexOf('GameID');
+  var rowIdx = -1;
+  for (var r = 1; r < data.length; r++) {
     if (String(data[r][idCol]) === String(game.id)) { rowIdx = r + 1; break; }
   }
-  const row = gameToRow(headers, game);
+  var row = gameToRow(headers, game);
   if (rowIdx > 0) {
     sheet.getRange(rowIdx, 1, 1, row.length).setValues([row]);
   } else {
@@ -301,14 +271,15 @@ function upsertGame(sheet, game) {
 }
 
 function updateGameColumns(sheet, gameId, updates) {
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const data = sheet.getDataRange().getValues();
-  const idCol = headers.indexOf('GameID');
-  for (let r = 1; r < data.length; r++) {
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var data = sheet.getDataRange().getValues();
+  var idCol = headers.indexOf('GameID');
+  for (var r = 1; r < data.length; r++) {
     if (String(data[r][idCol]) !== String(gameId)) continue;
-    Object.entries(updates).forEach(([col, val]) => {
+    Object.entries(updates).forEach(function(entry) {
+      var col = entry[0], val = entry[1];
       if (val === undefined) return;
-      const c = headers.indexOf(col);
+      var c = headers.indexOf(col);
       if (c >= 0) sheet.getRange(r + 1, c + 1).setValue(val);
     });
     break;
@@ -317,25 +288,26 @@ function updateGameColumns(sheet, gameId, updates) {
 
 function ensureHeaders(sheet, headers) {
   if (sheet.getLastRow() === 0) { sheet.appendRow(headers); return headers; }
-  const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  // Add any missing columns to the right
-  const missing = headers.filter(h => !existing.includes(h));
+  var existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var missing = headers.filter(function(h) { return !existing.includes(h); });
   if (missing.length > 0) {
-    const startCol = existing.length + 1;
+    var startCol = existing.length + 1;
     sheet.getRange(1, startCol, 1, missing.length).setValues([missing]);
-    return [...existing, ...missing];
+    return existing.concat(missing);
   }
   return existing;
 }
 
-// ── Utilities ──
+// Utilities
 
 function sheetToObjects(sheet) {
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const [headers, ...rows] = sheet.getDataRange().getValues();
-  return rows.map(row => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i]; });
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var rows = values.slice(1);
+  return rows.map(function(row) {
+    var obj = {};
+    headers.forEach(function(h, i) { obj[h] = row[i]; });
     return obj;
   });
 }
@@ -349,33 +321,3 @@ function jsonResponse(data) {
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
-```
-
----
-
-## Google Sheet tab headers
-
-**Games** (Row 1):
-`GameID | Date | Opponent | Time | Venue | Result | Completed | IsActive | IsRetroactive | GoaliePresent | GoalieFillIn | Attendance | Lines | FinalLines | ReflectionCoach1 | ReflectionCoach2 | LineNotesCoach1 | LineNotesCoach2 | StatsURL | GameNo | PlayerStats | Scoring`
-
-**LineChanges** (Row 1):
-`GameID | Timestamp | Lines | ChangedBy`
-
----
-
-## Finding a game number
-
-Go to `saintjohnballhockey.com/results/?seasonNo=5&teamNo=41`, hover a game result — the URL preview shows `game_no=NNN`. That number goes in the Import field.
-
-Known game numbers:
-| Date | Opponent | Game # |
-|------|----------|--------|
-| May 26 | Green U11 | 623 |
-| May 28 | Red U11 | ? |
-
----
-
-## Stats links
-
-- Results: https://saintjohnballhockey.com/results/?seasonNo=5&teamNo=41
-- Stats: https://saintjohnballhockey.com/statistics/?seasonNo=5&teamNo=41
