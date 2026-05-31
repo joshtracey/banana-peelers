@@ -4,6 +4,8 @@ const STATE = {
   games: [],
   activeGameId: null,
   activeReflectionGameId: null,
+  pendingImportGameId: null,
+  pendingImportData: null,
   currentTab: 'today'
 };
 
@@ -260,6 +262,7 @@ function renderGameManagement(game) {
     </div>
 
     ${goalieBanner}
+    ${renderStatsBar(game)}
 
     <div class="attendance-section">
       <div class="section-header">
@@ -478,6 +481,165 @@ function switchCoach() {
   if (confirm('Switch coach? This will reload the page.')) {
     localStorage.removeItem('bp_coach');
     location.reload();
+  }
+}
+
+// ── Stats import ──
+
+function renderStatsBar(game) {
+  if (game.playerStats && game.playerStats.length > 0) {
+    const total = game.playerStats.reduce((s, p) => s + p.g, 0);
+    return `
+      <div class="stats-imported-bar">
+        <span>📊 Game #${game.gameNo} · ${total} goals imported</span>
+        <button class="btn btn-sm btn-secondary" onclick="showImportModal('${game.id}')">Re-import</button>
+      </div>
+      ${renderStatsTable(game)}`;
+  }
+  return `<button class="import-btn" onclick="showImportModal('${game.id}')">
+    📊 Import Game Stats
+  </button>`;
+}
+
+function renderStatsTable(game) {
+  if (!game.playerStats || !game.playerStats.length) return '';
+  const roster = getRoster();
+  const rows = game.playerStats
+    .slice()
+    .sort((a, b) => b.pts - a.pts || b.g - a.g)
+    .map(s => {
+      const player = roster.find(p => p.number === s.number);
+      const nameParts = player ? player.name.split(' ') : [];
+      const name = player
+        ? nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '')
+        : '#' + s.number;
+      return `<tr>
+        <td>${name}</td>
+        <td>${s.g}</td>
+        <td>${s.a}</td>
+        <td class="pts-col">${s.pts}</td>
+      </tr>`;
+    }).join('');
+  return `
+    <table class="stats-table" style="margin-bottom:16px">
+      <thead><tr><th>Player</th><th>G</th><th>A</th><th>Pts</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function showImportModal(gameId) {
+  STATE.pendingImportGameId = gameId;
+  STATE.pendingImportData = null;
+  const game = STATE.games.find(g => g.id === gameId);
+  document.getElementById('game-no-input').value = game && game.gameNo ? game.gameNo : '';
+  document.getElementById('import-results').innerHTML = '';
+  document.getElementById('import-footer').classList.add('hidden');
+  document.getElementById('import-fetch-btn').textContent = 'Fetch';
+  document.getElementById('import-fetch-btn').disabled = false;
+  document.getElementById('import-modal').classList.remove('hidden');
+}
+
+async function doImport() {
+  const gameNo = document.getElementById('game-no-input').value.trim();
+  if (!gameNo) return;
+
+  const btn = document.getElementById('import-fetch-btn');
+  btn.textContent = 'Fetching…';
+  btn.disabled = true;
+  document.getElementById('import-results').innerHTML =
+    '<div class="loading-state" style="padding:16px 0">Fetching game sheet from Shark system…</div>';
+  document.getElementById('import-footer').classList.add('hidden');
+
+  try {
+    const data = await Sync.importGameSheet(gameNo);
+    if (data.error) {
+      document.getElementById('import-results').innerHTML =
+        `<p style="color:var(--red);margin-top:12px">${escHtml(data.error)}</p>`;
+    } else {
+      STATE.pendingImportData = data;
+      renderImportPreview(data);
+      document.getElementById('import-footer').classList.remove('hidden');
+    }
+  } catch (e) {
+    document.getElementById('import-results').innerHTML =
+      `<p style="color:var(--red);margin-top:12px">Could not reach Apps Script. Check your connection.</p>`;
+  } finally {
+    btn.textContent = 'Fetch';
+    btn.disabled = false;
+  }
+}
+
+function renderImportPreview(data) {
+  const roster = getRoster();
+  const rows = data.playerStats
+    .slice()
+    .sort((a, b) => b.pts - a.pts || b.g - a.g)
+    .map(s => {
+      const player = roster.find(p => p.number === s.number);
+      const name = player ? player.name : '#' + s.number;
+      return `<tr>
+        <td>${name}</td>
+        <td>${s.g}</td>
+        <td>${s.a}</td>
+        <td class="pts-col">${s.pts}</td>
+      </tr>`;
+    }).join('');
+
+  const attendNames = (data.roster || [])
+    .map(r => {
+      const p = roster.find(pl => pl.number === r.number);
+      return p ? p.name.split(' ')[0] : '#' + r.number;
+    }).join(', ');
+
+  document.getElementById('import-results').innerHTML = `
+    <hr class="divider">
+    <div class="section-title" style="margin-bottom:8px">
+      ${data.totalGoals} goals · Game #${data.gameNo}
+    </div>
+    <table class="stats-table">
+      <thead><tr><th>Player</th><th>G</th><th>A</th><th>Pts</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${attendNames ? `
+    <div style="margin-top:12px">
+      <div class="form-label">Attendance (from sheet)</div>
+      <div class="text-muted" style="font-size:13px">${attendNames}</div>
+    </div>` : ''}`;
+}
+
+function confirmImport() {
+  const game = STATE.games.find(g => g.id === STATE.pendingImportGameId);
+  if (!game || !STATE.pendingImportData) return;
+
+  const data = STATE.pendingImportData;
+  game.gameNo = data.gameNo;
+  game.playerStats = data.playerStats;
+  game.scoring = data.scoring;
+
+  // Auto-update attendance from game sheet roster
+  if (data.roster && data.roster.length > 0) {
+    const roster = getRoster();
+    const presentIds = data.roster
+      .map(r => roster.find(p => p.number === r.number))
+      .filter(Boolean)
+      .map(p => p.id);
+    if (presentIds.length > 0) game.attendance = presentIds;
+    // Set goalie presence
+    const goaliePresent = data.roster.some(r => {
+      const p = roster.find(pl => pl.number === r.number);
+      return p && p.position === 'G';
+    });
+    game.goaliePresent = goaliePresent;
+  }
+
+  Sync.saveGame(game);
+  closeModal('import-modal');
+
+  // Re-render wherever we are
+  if (STATE.activeGameId === game.id) {
+    renderGameManagement(game);
+  } else if (STATE.currentTab === 'history') {
+    History.render();
   }
 }
 

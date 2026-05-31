@@ -155,10 +155,18 @@ const History = {
         </a>`;
     }
 
+    // Stats table (if imported)
+    if (game.playerStats && game.playerStats.length > 0) {
+      html += `<hr class="divider">` + renderStatsTable(game);
+    }
+
     // Actions
     html += '<div class="game-actions" style="margin-top:12px">';
     html += `<button class="btn btn-secondary btn-sm" onclick="History.openReflection('${game.id}')">
       ✍️ Add / Edit Reflection
+    </button>`;
+    html += `<button class="btn btn-outline btn-sm" onclick="showImportModal('${game.id}')">
+      📊 ${game.playerStats && game.playerStats.length ? 'Re-import Stats' : 'Import Game Stats'}
     </button>`;
     if (!hasLines) {
       html += `<button class="btn btn-outline btn-sm" onclick="History.openRetroactive('${game.id}')">

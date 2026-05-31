@@ -100,13 +100,19 @@ const Lines = {
 
     const linesHTML = lines.map((line, idx) => {
       const complete = this.isComplete(line);
+      const lineStats = this.calcLineStats(game, line);
+      const ptsBadge = lineStats && lineStats.pts > 0
+        ? `<span class="line-pts-badge">${lineStats.g}G ${lineStats.a}A</span>` : '';
       return `
         <div class="line-card" id="line-card-${line.id}">
           <div class="line-card-header">
             <span class="line-card-title">Line ${idx + 1}</span>
-            <span class="line-complete-badge ${complete ? 'complete' : 'incomplete'}">
-              ${complete ? '✓ Full' : 'Needs players'}
-            </span>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${ptsBadge}
+              <span class="line-complete-badge ${complete ? 'complete' : 'incomplete'}">
+                ${complete ? '✓ Full' : 'Needs players'}
+              </span>
+            </div>
           </div>
           <div class="line-card-body">
             <div class="line-slots-row">
@@ -256,6 +262,20 @@ const Lines = {
     // Move players from last line back to unassigned (they stay in attendance)
     game.lines.pop();
     this.saveAndRender(game);
+  },
+
+  calcLineStats(game, line) {
+    if (!game.playerStats || game.playerStats.length === 0) return null;
+    const roster = getRoster();
+    const ids = [...(line.forwards || []), ...(line.defence || [])].filter(Boolean);
+    let g = 0, a = 0;
+    ids.forEach(id => {
+      const player = roster.find(p => p.id === id);
+      if (!player) return;
+      const s = game.playerStats.find(s => s.number === player.number);
+      if (s) { g += s.g; a += s.a; }
+    });
+    return { g, a, pts: g + a };
   },
 
   saveAndRender(game) {

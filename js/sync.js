@@ -40,6 +40,10 @@ const Sync = {
     }
   },
 
+  async importGameSheet(gameNo) {
+    return this.post({ type: 'parseGameSheet', gameNo: parseInt(gameNo) });
+  },
+
   async saveReflection(gameId, coach, reflection, lineNotes, statsUrl) {
     const game = STATE.games.find(g => g.id === gameId);
     if (!game) return;

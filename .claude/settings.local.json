@@ -3,7 +3,13 @@
     "allow": [
       "Bash(git init *)",
       "Bash(git config *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git remote *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl *)",
+      "Bash(git commit -m 'Fix invalid date display: strip to YYYY-MM-DD before parsing, fall back gracefully if still invalid *)",
+      "WebFetch(domain:saintjohnballhockey.com)"
     ]
   }
 }

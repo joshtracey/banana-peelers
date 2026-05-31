@@ -76,6 +76,33 @@
     </div>
   </div>
 
+  <!-- Import game stats modal -->
+  <div id="import-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Import Game Stats</h2>
+        <button class="modal-close" onclick="closeModal('import-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Game Sheet #</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="game-no-input" class="form-input" placeholder="e.g. 623" min="1" style="flex:1">
+          <button class="btn btn-primary" id="import-fetch-btn" onclick="doImport()" style="width:auto;padding:12px 20px;white-space:nowrap">
+            Fetch
+          </button>
+        </div>
+        <p style="font-size:12px;color:var(--grey-400);margin-top:6px">
+          Find the # on saintjohnballhockey.com/results — hover a game to see the URL
+        </p>
+        <div id="import-results"></div>
+      </div>
+      <div class="modal-footer hidden" id="import-footer">
+        <button class="btn btn-secondary" onclick="closeModal('import-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmImport()">Save Stats</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Game select modal (for History retroactive) -->
   <div id="retroactive-modal" class="modal-overlay hidden">
     <div class="modal">
