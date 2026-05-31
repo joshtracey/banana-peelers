@@ -1,4 +1,4 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxdiJ5GsZ6cK-2xJWjaS04ju38jgVk11fL2aP4-MmcjAz9fzdcFIIjUCkXJX7Z2fcQ1/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx7XJS6gb8yQKvxHPt4N0z7i5TkaJnOtTheGdbwK5mTn7qcLdFoX-6EZIp7BsjrkDMq/exec';
 
 const Sync = {
   pollInterval: null,
