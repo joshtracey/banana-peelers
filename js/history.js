@@ -254,6 +254,8 @@ function escAttr(str) {
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', weekday: 'short' });
+  const clean = String(dateStr).slice(0, 10);
+  const d = new Date(clean + 'T12:00:00');
+  if (isNaN(d.getTime())) return clean;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
 }
