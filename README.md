@@ -86,10 +86,9 @@ function parseGameSheet(gameNo) {
 
 function pdfToText(blob) {
   // Upload PDF to Drive as a Google Doc (converts automatically), extract text, delete.
-  const file = Drive.Files.insert(
-    { title: '_bp_temp_' + Date.now(), mimeType: 'application/vnd.google-apps.document' },
-    blob,
-    { convert: true }
+  const file = Drive.Files.create(
+    { name: '_bp_temp_' + Date.now(), mimeType: 'application/vnd.google-apps.document' },
+    blob
   );
   try {
     const doc = DocumentApp.openById(file.id);
