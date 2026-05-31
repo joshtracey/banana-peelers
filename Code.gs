@@ -68,9 +68,7 @@ function parseGameSheet(gameNo) {
 
 function pdfToText(blob) {
   // Upload PDF to Drive REST API to convert it to a Google Doc, then export as text.
-  // DriveApp.getRootFolder() below is intentional: it triggers the Drive OAuth scope.
   var token = ScriptApp.getOAuthToken();
-  DriveApp.getRootFolder();
 
   var boundary = 'bp_boundary_' + Date.now();
   var metadata = JSON.stringify({
@@ -115,7 +113,13 @@ function pdfToText(blob) {
     );
     return textResp.getContentText();
   } finally {
-    try { DriveApp.getFileById(fileId).setTrashed(true); } catch(e) {}
+    try {
+      UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token },
+        muteHttpExceptions: true
+      });
+    } catch(e) {}
   }
 }
 
