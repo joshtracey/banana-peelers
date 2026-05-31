@@ -236,8 +236,9 @@ function renderGameManagement(game) {
         </select>` : ''}
     </div>` : '';
 
-  // Ensure lines exist
-  if (!game.lines || game.lines.length === 0) {
+  // Ensure lines exist — only auto-fill when there are genuinely no line objects at all
+  const hasLineObjects = game.lines && game.lines.length > 0;
+  if (!hasLineObjects) {
     game.lines = Lines.defaultLines(game.attendance);
     Sync.localSaveGames(STATE.games);
   }

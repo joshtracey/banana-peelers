@@ -83,10 +83,13 @@ const Sync = {
     try {
       const data = await this.fetchAll();
       if (data && data.games && data.games.length > 0) {
-        STATE.games = data.games;
-        ensureSchedule();
-        this.localSaveGames(STATE.games);
-        renderAll();
+        // Don't blow away a game already active from localStorage
+        if (!STATE.activeGameId) {
+          STATE.games = data.games;
+          ensureSchedule();
+          this.localSaveGames(STATE.games);
+          renderAll();
+        }
       } else if (!localGames) {
         ensureSchedule();
         renderAll();
@@ -111,13 +114,21 @@ const Sync = {
       try {
         const data = await this.fetchAll();
         if (data && data.games && data.games.length > 0) {
+          // Preserve any game that is actively being managed locally
+          const merged = data.games.map(remoteGame => {
+            if (remoteGame.id === STATE.activeGameId) {
+              return STATE.games.find(g => g.id === STATE.activeGameId) || remoteGame;
+            }
+            return remoteGame;
+          });
           const localStr = JSON.stringify(STATE.games);
-          const remoteStr = JSON.stringify(data.games);
-          if (localStr !== remoteStr) {
-            STATE.games = data.games;
+          const mergedStr = JSON.stringify(merged);
+          if (localStr !== mergedStr) {
+            STATE.games = merged;
             ensureSchedule();
             this.localSaveGames(STATE.games);
-            renderAll();
+            // Don't re-render the Today tab while a game is being managed
+            if (!STATE.activeGameId) renderAll();
           }
           this.lastSyncTime = Date.now();
           this.setSyncStatus('ok');

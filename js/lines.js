@@ -217,9 +217,9 @@ const Lines = {
       line[group][idx] = this.selectedPlayerId;
       this.selectedPlayerId = null;
     } else if (currentOccupant) {
-      // No player selected — select the occupant
+      // Pick up the occupant — mutate state but don't save yet
       this.selectedPlayerId = currentOccupant;
-      this.removeFromSlot(gameId, lineId, group, idx);
+      line[group][idx] = null;
       this.render(gameId);
       return;
     }
