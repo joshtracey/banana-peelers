@@ -183,43 +183,31 @@ function parseGameSheetText(text, gameNo) {
     if (g.assist2) ourNumbers[g.assist2] = true;
   });
 
-  // Exclusive numbers: in our scoring but not opponent's scoring
-  var exclusiveNums = Object.keys(ourNumbers).filter(function(n) { return !theirNumbers[n]; }).map(Number);
-
-  // Player roster lines: lines that look like "21 August Crabbe 22 Crawford Smith 63 ..."
+  // Extract players from ALL player-roster lines in the document.
+  // App.js filters to our team using number+last-name validation, so including
+  // both teams' rosters here is safe.
   var playerLineRe = /\b\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/;
-
-  // For each exclusive number, find which player-roster lines contain it
-  var numToRosterLines = {};
-  exclusiveNums.forEach(function(n) {
-    var re = new RegExp('\\b' + n + '\\b');
-    numToRosterLines[n] = allLines.filter(function(l) {
-      return re.test(l) && playerLineRe.test(l);
-    });
-  });
-
-  // Clean anchors: exclusive numbers appearing on exactly ONE player-roster line
-  // Extract all (number, name) pairs from those lines
-  var rosterMap = {};
   var extractRe = /\b(\d+)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g;
-  exclusiveNums.forEach(function(n) {
-    if (numToRosterLines[n].length !== 1) return;
-    var line = numToRosterLines[n][0];
+  var rosterMap = {};
+  for (var li = 0; li < allLines.length; li++) {
+    if (!playerLineRe.test(allLines[li])) continue;
     var m;
     extractRe.lastIndex = 0;
-    while ((m = extractRe.exec(line)) !== null) {
-      rosterMap[parseInt(m[1])] = m[2].trim();
+    while ((m = extractRe.exec(allLines[li])) !== null) {
+      if (!rosterMap.hasOwnProperty(parseInt(m[1]))) {
+        rosterMap[parseInt(m[1])] = m[2].trim();
+      }
     }
-  });
+  }
 
   // Ensure all our scoring participants are in the roster (with name if found, else null)
   Object.keys(ourNumbers).forEach(function(n) {
     var num = parseInt(n);
-    if (!(num in rosterMap)) rosterMap[num] = null;
+    if (!rosterMap.hasOwnProperty(num)) rosterMap[num] = null;
   });
 
   // Detect goalie via "Name (#number)" pattern (one entry per team in the document)
-  var goalieRe = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+\(#(\d+)\)/g;
+  var goalieRe = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\(#(\d+)\)/g;
   var goalieMatches = [];
   var fullText = allLines.join('\n');
   var gm;

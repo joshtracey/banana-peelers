@@ -610,7 +610,16 @@ function renderImportPreview(data) {
 function matchRosterEntry(r, roster) {
   if (r.number != null) {
     const byNum = roster.find(p => p.number === r.number);
-    if (byNum) return byNum;
+    if (byNum) {
+      // Validate last name to filter out opponent players with the same jersey number
+      if (r.name) {
+        const rLast = r.name.trim().split(/\s+/).pop().toLowerCase();
+        const pLast = byNum.name.trim().split(/\s+/).pop().toLowerCase();
+        if (rLast === pLast) return byNum;
+      } else {
+        return byNum;
+      }
+    }
   }
   if (r.name) {
     const rName = r.name.toLowerCase().replace(/\s+/g, ' ').trim();
