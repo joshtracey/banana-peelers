@@ -576,7 +576,7 @@ function renderImportPreview(data) {
     .sort((a, b) => b.pts - a.pts || b.g - a.g)
     .map(s => {
       const player = roster.find(p => p.number === s.number);
-      const name = player ? player.name : '#' + s.number;
+      const name = player ? player.name : (s.name || '#' + s.number);
       return `<tr>
         <td>${name}</td>
         <td>${s.g}</td>
@@ -587,8 +587,8 @@ function renderImportPreview(data) {
 
   const attendNames = (data.roster || [])
     .map(r => {
-      const p = roster.find(pl => pl.number === r.number);
-      return p ? p.name.split(' ')[0] : '#' + r.number;
+      const p = matchRosterEntry(r, roster);
+      return p ? p.name.split(' ')[0] : (r.name ? r.name.split(' ')[0] : '#' + r.number);
     }).join(', ');
 
   document.getElementById('import-results').innerHTML = `
@@ -604,11 +604,19 @@ function renderImportPreview(data) {
     <div style="margin-top:12px">
       <div class="form-label">Attendance (from sheet)</div>
       <div class="text-muted" style="font-size:13px">${attendNames}</div>
-    </div>` : ''}
-    ${data.debugRaw !== undefined ? `
-    <hr class="divider">
-    <div class="form-label" style="margin-bottom:4px">Debug — raw extracted text (copy &amp; send to Claude)</div>
-    <textarea readonly style="width:100%;height:200px;font-size:11px;font-family:monospace;white-space:pre">${escHtml(data.debugRaw)}</textarea>` : ''}`;
+    </div>` : ''}`;
+}
+
+function matchRosterEntry(r, roster) {
+  if (r.number != null) {
+    const byNum = roster.find(p => p.number === r.number);
+    if (byNum) return byNum;
+  }
+  if (r.name) {
+    const rName = r.name.toLowerCase().replace(/\s+/g, ' ').trim();
+    return roster.find(p => p.name.toLowerCase().replace(/\s+/g, ' ').trim() === rName) || null;
+  }
+  return null;
 }
 
 function confirmImport() {
@@ -624,16 +632,14 @@ function confirmImport() {
   if (data.roster && data.roster.length > 0) {
     const roster = getRoster();
     const presentIds = data.roster
-      .map(r => roster.find(p => p.number === r.number))
+      .map(r => matchRosterEntry(r, roster))
       .filter(Boolean)
       .map(p => p.id);
     if (presentIds.length > 0) game.attendance = presentIds;
-    // Set goalie presence
-    const goaliePresent = data.roster.some(r => {
-      const p = roster.find(pl => pl.number === r.number);
+    game.goaliePresent = data.roster.some(r => {
+      const p = matchRosterEntry(r, roster);
       return p && p.position === 'G';
     });
-    game.goaliePresent = goaliePresent;
   }
 
   Sync.saveGame(game);

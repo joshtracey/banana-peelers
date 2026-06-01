@@ -59,14 +59,10 @@ function parseGameSheet(gameNo) {
     }
     var blob = resp.getBlob().setName('bp_gs_' + gameNo + '.pdf');
     var text = pdfToText(blob);
-    // Always return first 1500 chars of raw text so we can diagnose extraction issues
-    var rawSnippet = text ? text.substring(0, 1500) : '(pdfToText returned null/empty)';
     if (!text || text.trim().length === 0) {
-      return { error: 'Could not extract text from game sheet.', debugRaw: rawSnippet };
+      return { error: 'Could not extract text from game sheet.' };
     }
-    var result = parseGameSheetText(text, gameNo);
-    result.debugRaw = rawSnippet;
-    return result;
+    return parseGameSheetText(text, gameNo);
   } catch (err) {
     return { error: err.message };
   }
@@ -136,10 +132,7 @@ function pdfToText(blob) {
 function parseGameSheetText(text, gameNo) {
   var allLines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  // The PDF is two-column and gets linearized with both teams interleaved.
-  // Each team has its own "G A A Time Per." scoring header. Our team (Yellow U11)
-  // is always the SECOND team listed because Green U11 appears first in this PDF layout.
-  // Find which "G A A Time Per." section belongs to us.
+  // Find both "G A A Time Per." scoring section headers
   var scoringHeaders = [];
   for (var i = 0; i < allLines.length; i++) {
     if (/G\s+A\s+A\s+Time/i.test(allLines[i])) scoringHeaders.push(i);
@@ -154,31 +147,94 @@ function parseGameSheetText(text, gameNo) {
     if (ourFirstLine === -1 && allLines[ti].indexOf(TEAM_NAME) !== -1) ourFirstLine = ti;
     if (otherFirstLine === -1 && /[A-Za-z]+\s+U\d+/i.test(allLines[ti]) && allLines[ti].indexOf(TEAM_NAME) === -1) otherFirstLine = ti;
   }
-  // If another team name appears before ours, we are the second team → use second scoring section
   var weAreSecond = otherFirstLine !== -1 && otherFirstLine < ourFirstLine;
-  var ourHeaderIdx = (weAreSecond && scoringHeaders.length >= 2) ? scoringHeaders[1] : scoringHeaders[0];
+  var ourHeaderIdx  = (weAreSecond && scoringHeaders.length >= 2) ? scoringHeaders[1] : scoringHeaders[0];
+  var theirHeaderIdx = (weAreSecond && scoringHeaders.length >= 2) ? scoringHeaders[0] : (scoringHeaders[1] !== undefined ? scoringHeaders[1] : -1);
 
-  // Collect all scoring entries from our section until end-of-scoring markers
+  // Collect our scoring entries
   var scoring = [];
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     if (/Franc jeu|Goaltender|Shootout/i.test(sline)) break;
-    // Strip the column header text if present on this line, keep any goal data after it
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
-    var lineGoals = parseScoringFromLine(sline);
-    scoring = scoring.concat(lineGoals);
+    scoring = scoring.concat(parseScoringFromLine(sline));
   }
 
-  // Build roster from unique jersey numbers that appeared in our scoring section
-  var seenNumbers = {};
+  // Collect opponent scoring numbers (to identify which numbers are exclusive to us)
+  var theirNumbers = {};
+  if (theirHeaderIdx >= 0) {
+    for (var tj = theirHeaderIdx; tj < allLines.length; tj++) {
+      var tline = allLines[tj];
+      if (/Franc jeu|Goaltender|Shootout/i.test(tline)) break;
+      tline = tline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
+      parseScoringFromLine(tline).forEach(function(g) {
+        if (g.scorer)  theirNumbers[g.scorer]  = true;
+        if (g.assist1) theirNumbers[g.assist1] = true;
+        if (g.assist2) theirNumbers[g.assist2] = true;
+      });
+    }
+  }
+
+  // Numbers that appeared in our scoring
+  var ourNumbers = {};
   scoring.forEach(function(g) {
-    if (g.scorer)  seenNumbers[g.scorer]  = true;
-    if (g.assist1) seenNumbers[g.assist1] = true;
-    if (g.assist2) seenNumbers[g.assist2] = true;
+    if (g.scorer)  ourNumbers[g.scorer]  = true;
+    if (g.assist1) ourNumbers[g.assist1] = true;
+    if (g.assist2) ourNumbers[g.assist2] = true;
   });
-  var roster = Object.keys(seenNumbers).map(function(n) {
-    return { number: parseInt(n) };
+
+  // Exclusive numbers: in our scoring but not opponent's scoring
+  var exclusiveNums = Object.keys(ourNumbers).filter(function(n) { return !theirNumbers[n]; }).map(Number);
+
+  // Player roster lines: lines that look like "21 August Crabbe 22 Crawford Smith 63 ..."
+  var playerLineRe = /\b\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/;
+
+  // For each exclusive number, find which player-roster lines contain it
+  var numToRosterLines = {};
+  exclusiveNums.forEach(function(n) {
+    var re = new RegExp('\\b' + n + '\\b');
+    numToRosterLines[n] = allLines.filter(function(l) {
+      return re.test(l) && playerLineRe.test(l);
+    });
   });
+
+  // Clean anchors: exclusive numbers appearing on exactly ONE player-roster line
+  // Extract all (number, name) pairs from those lines
+  var rosterMap = {};
+  var extractRe = /\b(\d+)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g;
+  exclusiveNums.forEach(function(n) {
+    if (numToRosterLines[n].length !== 1) return;
+    var line = numToRosterLines[n][0];
+    var m;
+    extractRe.lastIndex = 0;
+    while ((m = extractRe.exec(line)) !== null) {
+      rosterMap[parseInt(m[1])] = m[2].trim();
+    }
+  });
+
+  // Ensure all our scoring participants are in the roster (with name if found, else null)
+  Object.keys(ourNumbers).forEach(function(n) {
+    var num = parseInt(n);
+    if (!(num in rosterMap)) rosterMap[num] = null;
+  });
+
+  // Detect goalie via "Name (#number)" pattern (one entry per team in the document)
+  var goalieRe = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+\(#(\d+)\)/g;
+  var goalieMatches = [];
+  var fullText = allLines.join('\n');
+  var gm;
+  while ((gm = goalieRe.exec(fullText)) !== null) {
+    goalieMatches.push({ name: gm[1], number: parseInt(gm[2]) });
+  }
+  var goalieEntry = goalieMatches.length > 0 ? (goalieMatches[weAreSecond ? 1 : 0] || goalieMatches[0]) : null;
+
+  // Build roster array
+  var roster = Object.keys(rosterMap).map(function(n) {
+    return { number: parseInt(n), name: rosterMap[parseInt(n)] };
+  });
+  if (goalieEntry) {
+    roster.push({ number: goalieEntry.number, name: goalieEntry.name, isGoalie: true });
+  }
 
   // Tally stats
   var map = {};
