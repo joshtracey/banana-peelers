@@ -136,49 +136,54 @@ function pdfToText(blob) {
 function parseGameSheetText(text, gameNo) {
   var allLines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  var teamIdx = allLines.findIndex(function(l) { return l.includes(TEAM_NAME); });
-  if (teamIdx === -1) {
-    return { error: TEAM_NAME + ' not found in game sheet. Wrong game number?', debugLines: allLines.slice(0, 60) };
+  // The PDF is two-column and gets linearized with both teams interleaved.
+  // Each team has its own "G A A Time Per." scoring header. Our team (Yellow U11)
+  // is always the SECOND team listed because Green U11 appears first in this PDF layout.
+  // Find which "G A A Time Per." section belongs to us.
+  var scoringHeaders = [];
+  for (var i = 0; i < allLines.length; i++) {
+    if (/G\s+A\s+A\s+Time/i.test(allLines[i])) scoringHeaders.push(i);
   }
-  var teamLines = allLines.slice(teamIdx + 1);
-
-  // Roster: scan team section for jersey# + name rows
-  var roster = [];
-  var pastHeader = false;
-  for (var i = 0; i < teamLines.length; i++) {
-    var line = teamLines[i];
-    if (/^#\s*Player/i.test(line)) { pastHeader = true; continue; }
-    if (!pastHeader) continue;
-    if (/Support Staff|Team staff/i.test(line)) break;
-    var m = line.match(/^(\d+)\s+([A-Za-z]+(?: [A-Za-z]+)+)/);
-    if (m) roster.push({ number: parseInt(m[1]), name: m[2].trim() });
+  if (scoringHeaders.length === 0) {
+    return { error: 'No scoring section found in game sheet.', roster: [], scoring: [], playerStats: [], totalGoals: 0 };
   }
 
-  // Scoring: scan the FULL document — the scoring table can appear outside
-  // the team-specific section depending on how the PDF flows.
+  // Determine if our team is first or second in the document
+  var ourFirstLine = -1, otherFirstLine = -1;
+  for (var ti = 0; ti < allLines.length; ti++) {
+    if (ourFirstLine === -1 && allLines[ti].indexOf(TEAM_NAME) !== -1) ourFirstLine = ti;
+    if (otherFirstLine === -1 && /[A-Za-z]+\s+U\d+/i.test(allLines[ti]) && allLines[ti].indexOf(TEAM_NAME) === -1) otherFirstLine = ti;
+  }
+  // If another team name appears before ours, we are the second team → use second scoring section
+  var weAreSecond = otherFirstLine !== -1 && otherFirstLine < ourFirstLine;
+  var ourHeaderIdx = (weAreSecond && scoringHeaders.length >= 2) ? scoringHeaders[1] : scoringHeaders[0];
+
+  // Collect all scoring entries from our section until end-of-scoring markers
   var scoring = [];
-  var inScoring = false;
-  for (var j = 0; j < allLines.length; j++) {
+  for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
-    // Header row for the scoring table (several possible formats)
-    if (/G\s+A\s+A\s+Time/i.test(sline) || /Scorer.*Assist/i.test(sline)) {
-      inScoring = true;
-      continue;
-    }
-    if (!inScoring) continue;
-    // Stop at penalty or goaltender sections
-    if (/Suspension|Minor Penalt|Major and|Goaltender|Penalty Summary/i.test(sline)) break;
-    var goal = parseScoringLine(sline);
-    if (goal) scoring.push(goal);
+    if (/Franc jeu|Goaltender|Shootout/i.test(sline)) break;
+    // Strip the column header text if present on this line, keep any goal data after it
+    sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
+    var lineGoals = parseScoringFromLine(sline);
+    scoring = scoring.concat(lineGoals);
   }
 
-  // Tally stats — only count jersey numbers present in our roster
-  var ourNumbers = {};
-  roster.forEach(function(r) { ourNumbers[r.number] = true; });
+  // Build roster from unique jersey numbers that appeared in our scoring section
+  var seenNumbers = {};
+  scoring.forEach(function(g) {
+    if (g.scorer)  seenNumbers[g.scorer]  = true;
+    if (g.assist1) seenNumbers[g.assist1] = true;
+    if (g.assist2) seenNumbers[g.assist2] = true;
+  });
+  var roster = Object.keys(seenNumbers).map(function(n) {
+    return { number: parseInt(n) };
+  });
 
+  // Tally stats
   var map = {};
   function add(num, field) {
-    if (!num || !ourNumbers[num]) return;
+    if (!num) return;
     if (!map[num]) map[num] = { number: num, g: 0, a: 0, pts: 0 };
     map[num][field]++;
     map[num].pts++;
@@ -189,33 +194,45 @@ function parseGameSheetText(text, gameNo) {
     add(scoring[k].assist2, 'a');
   }
 
-  var result = {
+  return {
     gameNo: parseInt(gameNo),
     roster: roster,
     scoring: scoring,
     playerStats: Object.values(map),
     totalGoals: scoring.length
   };
-
-  // Always include debug lines so the format can be inspected
-  result.debugLines = allLines.slice(0, 80);
-
-  return result;
 }
 
-function parseScoringLine(line) {
+function parseScoringFromLine(line) {
+  // A single line can contain multiple concatenated scoring entries.
+  // Format per entry: [scorer#] [assist#]? [assist#]? [MM:SS] [P1|P2|P3|OT|SO]
+  // The period token marks the END of each entry.
+  var goals = [];
   var tokens = line.trim().split(/\s+/);
   var jerseys = [];
-  var time = null, period = null;
+  var time = null;
+
   for (var i = 0; i < tokens.length; i++) {
     var t = tokens[i];
-    if (/^\d+:\d+$/.test(t))                           time = t;
-    // Accept P1/P2/P3, 1/2/3, 1st/2nd/3rd, OT, SO
-    else if (/^(P?[123]|[123]st|[123]nd|[123]rd|OT|SO)$/i.test(t)) period = t;
-    else if (/^\d+$/.test(t) && !time)                 jerseys.push(parseInt(t));
+    if (/^\d+:\d+$/.test(t)) {
+      time = t;
+    } else if (/^(P[123]|OT|SO)$/i.test(t) && time !== null) {
+      if (jerseys.length > 0) {
+        goals.push({
+          scorer:  jerseys[0],
+          assist1: jerseys[1] || null,
+          assist2: jerseys[2] || null,
+          time:    time,
+          period:  t.toUpperCase()
+        });
+      }
+      jerseys = [];
+      time = null;
+    } else if (/^\d+$/.test(t) && time === null) {
+      jerseys.push(parseInt(t));
+    }
   }
-  if (!time || !period || jerseys.length === 0) return null;
-  return { scorer: jerseys[0], assist1: jerseys[1] || null, assist2: jerseys[2] || null, time: time, period: period };
+  return goals;
 }
 
 // Games sheet helpers
