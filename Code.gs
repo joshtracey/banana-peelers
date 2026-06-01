@@ -59,13 +59,13 @@ function parseGameSheet(gameNo) {
     }
     var blob = resp.getBlob().setName('bp_gs_' + gameNo + '.pdf');
     var text = pdfToText(blob);
-    if (!text) return { error: 'Could not extract text from game sheet.' };
-    var result = parseGameSheetText(text, gameNo);
-    // Include raw lines for debugging when goals = 0
-    if (!result.error && result.totalGoals === 0) {
-      var allLines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
-      result.debugLines = allLines.slice(0, 80);
+    // Always return first 1500 chars of raw text so we can diagnose extraction issues
+    var rawSnippet = text ? text.substring(0, 1500) : '(pdfToText returned null/empty)';
+    if (!text || text.trim().length === 0) {
+      return { error: 'Could not extract text from game sheet.', debugRaw: rawSnippet };
     }
+    var result = parseGameSheetText(text, gameNo);
+    result.debugRaw = rawSnippet;
     return result;
   } catch (err) {
     return { error: err.message };
@@ -73,44 +73,48 @@ function parseGameSheet(gameNo) {
 }
 
 function pdfToText(blob) {
-  // Upload PDF to Drive REST API to convert it to a Google Doc, then export as text.
+  // Use Drive API resumable upload to convert PDF -> Google Doc, then export as plain text.
+  // Resumable upload sends raw bytes (no base64 encoding) which is more reliable.
   var token = ScriptApp.getOAuthToken();
+  var pdfBytes = blob.getBytes();
 
-  var boundary = 'bp_boundary_' + Date.now();
-  var metadata = JSON.stringify({
-    name: '_bp_gs_tmp_' + Date.now(),
-    mimeType: 'application/vnd.google-apps.document'
-  });
-  var pdfBase64 = Utilities.base64Encode(blob.getBytes());
-
-  var body = [
-    '--' + boundary,
-    'Content-Type: application/json; charset=UTF-8',
-    '',
-    metadata,
-    '--' + boundary,
-    'Content-Type: application/pdf',
-    'Content-Transfer-Encoding: base64',
-    '',
-    pdfBase64,
-    '--' + boundary + '--'
-  ].join('\r\n');
-
-  var uploadResp = UrlFetchApp.fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+  // Step 1: Initiate the resumable upload session
+  var initResp = UrlFetchApp.fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
     {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + token,
-        'Content-Type': 'multipart/related; boundary=' + boundary
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': 'application/pdf',
+        'X-Upload-Content-Length': String(pdfBytes.length)
       },
-      payload: body,
+      payload: JSON.stringify({
+        name: '_bp_gs_tmp_' + Date.now(),
+        mimeType: 'application/vnd.google-apps.document'
+      }),
       muteHttpExceptions: true
     }
   );
 
+  if (initResp.getResponseCode() !== 200) return null;
+  var uploadUrl = initResp.getHeaders()['Location'] || initResp.getHeaders()['location'];
+  if (!uploadUrl) return null;
+
+  // Step 2: Upload the raw PDF bytes
+  var uploadResp = UrlFetchApp.fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/pdf' },
+    payload: pdfBytes,
+    muteHttpExceptions: true
+  });
+
+  if (uploadResp.getResponseCode() !== 200) return null;
   var fileId = JSON.parse(uploadResp.getContentText()).id;
   if (!fileId) return null;
+
+  // Give Drive a moment to finish the PDF->Doc conversion
+  Utilities.sleep(3000);
 
   try {
     var textResp = UrlFetchApp.fetch(
