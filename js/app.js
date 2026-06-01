@@ -585,11 +585,12 @@ function renderImportPreview(data) {
       </tr>`;
     }).join('');
 
+  const seenPreviewIds = new Set();
   const attendNames = (data.roster || [])
-    .map(r => {
-      const p = matchRosterEntry(r, roster);
-      return p ? p.name.split(' ')[0] : (r.name ? r.name.split(' ')[0] : '#' + r.number);
-    }).join(', ');
+    .map(r => matchRosterEntry(r, roster))
+    .filter(p => p && !seenPreviewIds.has(p.id) && seenPreviewIds.add(p.id))
+    .map(p => p.name.split(' ')[0])
+    .join(', ');
 
   document.getElementById('import-results').innerHTML = `
     <hr class="divider">
@@ -640,9 +641,10 @@ function confirmImport() {
   // Auto-update attendance from game sheet roster
   if (data.roster && data.roster.length > 0) {
     const roster = getRoster();
+    const seenIds = new Set();
     const presentIds = data.roster
       .map(r => matchRosterEntry(r, roster))
-      .filter(Boolean)
+      .filter(p => p && !seenIds.has(p.id) && seenIds.add(p.id))
       .map(p => p.id);
     if (presentIds.length > 0) game.attendance = presentIds;
     game.goaliePresent = data.roster.some(r => {

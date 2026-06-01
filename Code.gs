@@ -183,28 +183,29 @@ function parseGameSheetText(text, gameNo) {
     if (g.assist2) ourNumbers[g.assist2] = true;
   });
 
-  // Extract players from ALL player-roster lines in the document.
-  // App.js filters to our team using number+last-name validation, so including
-  // both teams' rosters here is safe.
-  // Patterns are case-insensitive to handle all-caps names common on formal game sheets.
+  // Extract player-roster lines only from our team's section of the document
+  // (between where our team name appears and where our scoring section begins).
+  // This avoids picking up opponent players. Patterns are case-insensitive to
+  // handle all-caps names common on formal game sheets.
   var playerLineRe = /\b\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)+/;
   var extractRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
-  var rosterMap = {};
-  for (var li = 0; li < allLines.length; li++) {
+  var rosterEntries = [];
+  var seenOnRosterLine = {};
+  var sectionStart = ourFirstLine >= 0 ? ourFirstLine : 0;
+  for (var li = sectionStart; li < ourHeaderIdx; li++) {
     if (!playerLineRe.test(allLines[li])) continue;
     var m;
     extractRe.lastIndex = 0;
     while ((m = extractRe.exec(allLines[li])) !== null) {
-      if (!rosterMap.hasOwnProperty(parseInt(m[1]))) {
-        rosterMap[parseInt(m[1])] = m[2].trim();
-      }
+      rosterEntries.push({ number: parseInt(m[1]), name: m[2].trim() });
+      seenOnRosterLine[parseInt(m[1])] = true;
     }
   }
 
-  // Ensure all our scoring participants are in the roster (with name if found, else null)
+  // Scoring participants not found on any roster line get a number-only fallback
   Object.keys(ourNumbers).forEach(function(n) {
     var num = parseInt(n);
-    if (!rosterMap.hasOwnProperty(num)) rosterMap[num] = null;
+    if (!seenOnRosterLine[num]) rosterEntries.push({ number: num, name: null });
   });
 
   // Detect goalie via "Name (#number)" pattern (one entry per team in the document)
@@ -216,14 +217,11 @@ function parseGameSheetText(text, gameNo) {
     goalieMatches.push({ name: gm[1], number: parseInt(gm[2]) });
   }
   var goalieEntry = goalieMatches.length > 0 ? (goalieMatches[weAreSecond ? 1 : 0] || goalieMatches[0]) : null;
-
-  // Build roster array
-  var roster = Object.keys(rosterMap).map(function(n) {
-    return { number: parseInt(n), name: rosterMap[parseInt(n)] };
-  });
   if (goalieEntry) {
-    roster.push({ number: goalieEntry.number, name: goalieEntry.name, isGoalie: true });
+    rosterEntries.push({ number: goalieEntry.number, name: goalieEntry.name, isGoalie: true });
   }
+
+  var roster = rosterEntries;
 
   // Tally stats
   var map = {};
