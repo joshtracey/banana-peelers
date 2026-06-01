@@ -60,7 +60,13 @@ function parseGameSheet(gameNo) {
     var blob = resp.getBlob().setName('bp_gs_' + gameNo + '.pdf');
     var text = pdfToText(blob);
     if (!text) return { error: 'Could not extract text from game sheet.' };
-    return parseGameSheetText(text, gameNo);
+    var result = parseGameSheetText(text, gameNo);
+    // Include raw lines for debugging when goals = 0
+    if (!result.error && result.totalGoals === 0) {
+      var allLines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+      result.debugLines = allLines.slice(0, 80);
+    }
+    return result;
   } catch (err) {
     return { error: err.message };
   }

@@ -604,7 +604,11 @@ function renderImportPreview(data) {
     <div style="margin-top:12px">
       <div class="form-label">Attendance (from sheet)</div>
       <div class="text-muted" style="font-size:13px">${attendNames}</div>
-    </div>` : ''}`;
+    </div>` : ''}
+    ${data.debugLines ? `
+    <hr class="divider">
+    <div class="form-label" style="margin-bottom:4px">Debug — raw extracted lines (copy &amp; send to Claude)</div>
+    <textarea readonly style="width:100%;height:200px;font-size:11px;font-family:monospace">${escHtml(data.debugLines.join('\n'))}</textarea>` : ''}`;
 }
 
 function confirmImport() {
