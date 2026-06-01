@@ -50,7 +50,6 @@ function doPost(e) {
 // Game sheet import
 
 function parseGameSheet(gameNo) {
-  try { DriveApp.getRootFolder(); } catch(e) { return { error: 'Drive auth failed: ' + e.message }; }
   var url = 'https://saintjohnballhockey.com/shark_modules/modules/GameReports/GameSheet.php'
           + '?site=1&lang=en&game_no=' + gameNo;
   try {
@@ -156,14 +155,13 @@ function parseGameSheetText(text, gameNo) {
 
   // Collect our scoring entries
   var scoring = [];
-  var debugScoringLines = [];
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
     var stop = stopIdx >= 0;
     if (stop) sline = sline.slice(0, stopIdx);
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
-    if (sline) { debugScoringLines.push(sline); scoring = scoring.concat(parseScoringFromLine(sline)); }
+    if (sline) scoring = scoring.concat(parseScoringFromLine(sline));
     if (stop) break;
   }
 
@@ -249,8 +247,7 @@ function parseGameSheetText(text, gameNo) {
     roster: roster,
     scoring: scoring,
     playerStats: Object.values(map),
-    totalGoals: scoring.length,
-    debugScoring: debugScoringLines.join('\n')
+    totalGoals: scoring.length
   };
 }
 
