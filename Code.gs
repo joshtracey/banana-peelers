@@ -71,6 +71,8 @@ function parseGameSheet(gameNo) {
 function pdfToText(blob) {
   // Use Drive API resumable upload to convert PDF -> Google Doc, then export as plain text.
   // Resumable upload sends raw bytes (no base64 encoding) which is more reliable.
+  // DriveApp call ensures the drive scope is granted when the script is authorized.
+  DriveApp.getRootFolder();
   var token = ScriptApp.getOAuthToken();
   var pdfBytes = blob.getBytes();
 
