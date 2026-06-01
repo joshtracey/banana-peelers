@@ -592,6 +592,11 @@ function renderImportPreview(data) {
     .map(p => p.name.split(' ')[0])
     .join(', ');
 
+  const debugBlock = (data._debugFalseLines && data._debugFalseLines.length > 0)
+    ? `<div style="margin-top:12px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px;font-size:12px;font-family:monospace;word-break:break-all">
+        <strong>DEBUG — lines producing scorer #21:</strong><br>${data._debugFalseLines.map(l => l.replace(/</g,'&lt;')).join('<br>')}</div>`
+    : '';
+
   document.getElementById('import-results').innerHTML = `
     <hr class="divider">
     <div class="section-title" style="margin-bottom:8px">
@@ -606,6 +611,7 @@ function renderImportPreview(data) {
       <div class="form-label">Attendance (from sheet)</div>
       <div class="text-muted" style="font-size:13px">${attendNames}</div>
     </div>` : ''}
+    ${debugBlock}
     `;
 }
 
