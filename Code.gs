@@ -186,8 +186,9 @@ function parseGameSheetText(text, gameNo) {
   // Extract players from ALL player-roster lines in the document.
   // App.js filters to our team using number+last-name validation, so including
   // both teams' rosters here is safe.
-  var playerLineRe = /\b\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/;
-  var extractRe = /\b(\d+)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g;
+  // Patterns are case-insensitive to handle all-caps names common on formal game sheets.
+  var playerLineRe = /\b\d+\s+[A-Za-z]+(?:\s+[A-Za-z]+)+/;
+  var extractRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
   var rosterMap = {};
   for (var li = 0; li < allLines.length; li++) {
     if (!playerLineRe.test(allLines[li])) continue;
@@ -207,7 +208,7 @@ function parseGameSheetText(text, gameNo) {
   });
 
   // Detect goalie via "Name (#number)" pattern (one entry per team in the document)
-  var goalieRe = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\(#(\d+)\)/g;
+  var goalieRe = /([A-Za-z]+(?:\s+[A-Za-z]+)+)\s*\(#(\d+)\)/g;
   var goalieMatches = [];
   var fullText = allLines.join('\n');
   var gm;
