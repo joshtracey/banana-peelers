@@ -155,9 +155,12 @@ function parseGameSheetText(text, gameNo) {
   var scoring = [];
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
-    if (/Franc jeu|Goaltender|Shootout/i.test(sline)) break;
+    var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
+    var stop = stopIdx >= 0;
+    if (stop) sline = sline.slice(0, stopIdx);
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
-    scoring = scoring.concat(parseScoringFromLine(sline));
+    if (sline) scoring = scoring.concat(parseScoringFromLine(sline));
+    if (stop) break;
   }
 
   // Collect opponent scoring numbers (to identify which numbers are exclusive to us)
