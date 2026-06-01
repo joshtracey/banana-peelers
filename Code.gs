@@ -130,39 +130,51 @@ function pdfToText(blob) {
 }
 
 function parseGameSheetText(text, gameNo) {
-  var lines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+  var allLines = text.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
-  var teamIdx = lines.findIndex(function(l) { return l.includes(TEAM_NAME); });
+  var teamIdx = allLines.findIndex(function(l) { return l.includes(TEAM_NAME); });
   if (teamIdx === -1) {
-    return { error: TEAM_NAME + ' not found in game sheet. Wrong game number?' };
+    return { error: TEAM_NAME + ' not found in game sheet. Wrong game number?', debugLines: allLines.slice(0, 60) };
   }
-  var teamLines = lines.slice(teamIdx + 1);
+  var teamLines = allLines.slice(teamIdx + 1);
 
+  // Roster: scan team section for jersey# + name rows
   var roster = [];
   var pastHeader = false;
   for (var i = 0; i < teamLines.length; i++) {
     var line = teamLines[i];
-    if (/^#\s*Player/.test(line)) { pastHeader = true; continue; }
+    if (/^#\s*Player/i.test(line)) { pastHeader = true; continue; }
     if (!pastHeader) continue;
     if (/Support Staff|Team staff/i.test(line)) break;
     var m = line.match(/^(\d+)\s+([A-Za-z]+(?: [A-Za-z]+)+)/);
     if (m) roster.push({ number: parseInt(m[1]), name: m[2].trim() });
   }
 
+  // Scoring: scan the FULL document — the scoring table can appear outside
+  // the team-specific section depending on how the PDF flows.
   var scoring = [];
   var inScoring = false;
-  for (var j = 0; j < teamLines.length; j++) {
-    var tline = teamLines[j];
-    if (/G\s+A\s+A\s+Time/.test(tline)) { inScoring = true; continue; }
+  for (var j = 0; j < allLines.length; j++) {
+    var sline = allLines[j];
+    // Header row for the scoring table (several possible formats)
+    if (/G\s+A\s+A\s+Time/i.test(sline) || /Scorer.*Assist/i.test(sline)) {
+      inScoring = true;
+      continue;
+    }
     if (!inScoring) continue;
-    if (/Suspension|Minor penalt|Major and|Goaltender/i.test(tline)) break;
-    var goal = parseScoringLine(tline);
+    // Stop at penalty or goaltender sections
+    if (/Suspension|Minor Penalt|Major and|Goaltender|Penalty Summary/i.test(sline)) break;
+    var goal = parseScoringLine(sline);
     if (goal) scoring.push(goal);
   }
 
+  // Tally stats — only count jersey numbers present in our roster
+  var ourNumbers = {};
+  roster.forEach(function(r) { ourNumbers[r.number] = true; });
+
   var map = {};
   function add(num, field) {
-    if (!num) return;
+    if (!num || !ourNumbers[num]) return;
     if (!map[num]) map[num] = { number: num, g: 0, a: 0, pts: 0 };
     map[num][field]++;
     map[num].pts++;
@@ -173,13 +185,18 @@ function parseGameSheetText(text, gameNo) {
     add(scoring[k].assist2, 'a');
   }
 
-  return {
+  var result = {
     gameNo: parseInt(gameNo),
     roster: roster,
     scoring: scoring,
     playerStats: Object.values(map),
     totalGoals: scoring.length
   };
+
+  // Always include debug lines so the format can be inspected
+  result.debugLines = allLines.slice(0, 80);
+
+  return result;
 }
 
 function parseScoringLine(line) {
@@ -188,9 +205,10 @@ function parseScoringLine(line) {
   var time = null, period = null;
   for (var i = 0; i < tokens.length; i++) {
     var t = tokens[i];
-    if (/^\d+:\d+$/.test(t))              time = t;
-    else if (/^(P[123]|OT|SO)$/i.test(t)) period = t.toUpperCase();
-    else if (/^\d+$/.test(t) && !time)    jerseys.push(parseInt(t));
+    if (/^\d+:\d+$/.test(t))                           time = t;
+    // Accept P1/P2/P3, 1/2/3, 1st/2nd/3rd, OT, SO
+    else if (/^(P?[123]|[123]st|[123]nd|[123]rd|OT|SO)$/i.test(t)) period = t;
+    else if (/^\d+$/.test(t) && !time)                 jerseys.push(parseInt(t));
   }
   if (!time || !period || jerseys.length === 0) return null;
   return { scorer: jerseys[0], assist1: jerseys[1] || null, assist2: jerseys[2] || null, time: time, period: period };
