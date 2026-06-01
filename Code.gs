@@ -50,6 +50,7 @@ function doPost(e) {
 // Game sheet import
 
 function parseGameSheet(gameNo) {
+  try { DriveApp.getRootFolder(); } catch(e) { return { error: 'Drive auth failed: ' + e.message }; }
   var url = 'https://saintjohnballhockey.com/shark_modules/modules/GameReports/GameSheet.php'
           + '?site=1&lang=en&game_no=' + gameNo;
   try {
