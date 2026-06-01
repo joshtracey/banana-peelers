@@ -153,6 +153,22 @@ function parseGameSheetText(text, gameNo) {
   var ourHeaderIdx  = (weAreSecond && scoringHeaders.length >= 2) ? scoringHeaders[1] : scoringHeaders[0];
   var theirHeaderIdx = (weAreSecond && scoringHeaders.length >= 2) ? scoringHeaders[0] : (scoringHeaders[1] !== undefined ? scoringHeaders[1] : -1);
 
+  // Build a map of jersey → first name words seen in our roster section.
+  // Used in pass 2 of parseScoringFromLine to skip roster entries masquerading as scorers.
+  // e.g. rosterCtx[21] = { AUGUST: true } so "21 AUGUST … time period" won't produce scorer=21.
+  var rosterCtx = {};
+  var sectionStart = ourFirstLine >= 0 ? ourFirstLine : 0;
+  for (var ri = sectionStart; ri < ourHeaderIdx; ri++) {
+    var rtoks = allLines[ri].split(/\s+/);
+    for (var rj = 0; rj < rtoks.length - 1; rj++) {
+      if (/^\d+$/.test(rtoks[rj]) && /^[A-Za-z]+$/.test(rtoks[rj + 1])) {
+        var rnum = parseInt(rtoks[rj]);
+        if (!rosterCtx[rnum]) rosterCtx[rnum] = {};
+        rosterCtx[rnum][rtoks[rj + 1].toUpperCase()] = true;
+      }
+    }
+  }
+
   // Collect our scoring entries
   var scoring = [];
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
@@ -160,8 +176,8 @@ function parseGameSheetText(text, gameNo) {
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
     var stop = stopIdx >= 0;
     if (stop) sline = sline.slice(0, stopIdx);
-    sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
-    if (sline) scoring = scoring.concat(parseScoringFromLine(sline));
+    sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').replace(/#\s*Code\s+Time\s+Per\./i, '').trim();
+    if (sline) scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
     if (stop) break;
   }
 
@@ -196,7 +212,6 @@ function parseGameSheetText(text, gameNo) {
   var extractRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
   var rosterEntries = [];
   var seenOnRosterLine = {};
-  var sectionStart = ourFirstLine >= 0 ? ourFirstLine : 0;
   for (var li = sectionStart; li < ourHeaderIdx; li++) {
     if (!playerLineRe.test(allLines[li])) continue;
     var m;
@@ -251,33 +266,69 @@ function parseGameSheetText(text, gameNo) {
   };
 }
 
-function parseScoringFromLine(line) {
-  // A single line can contain multiple concatenated scoring entries.
-  // Format per entry: [scorer#] [assist#]? [assist#]? [MM:SS] [P1|P2|P3|OT|SO]
-  // The period token marks the END of each entry.
+function parseScoringFromLine(line, rosterCtx) {
+  // For each TIME PERIOD anchor, find scorer/assist jerseys via two backward passes:
+  //
+  // Pass 1 (contiguous): collect numbers immediately before the time, stop at the
+  //   first non-number. Handles "21 AUGUST CRABBE 22 01:23 P1" correctly — finds 22,
+  //   stops at CRABBE, so roster jersey 21 is never included.
+  //
+  // Pass 2 (skip-names fallback): only when pass 1 finds nothing. Skips over name
+  //   tokens to find the scorer that sits before them. Uses rosterCtx (a map of
+  //   jersey → set of first-name words seen in our roster section) to skip past
+  //   roster entries: if jersey X is immediately followed (forward) by a word in
+  //   rosterCtx[X], X is a roster entry and not a scorer.
   var goals = [];
   var tokens = line.trim().split(/\s+/);
-  var jerseys = [];
-  var time = null;
 
-  for (var i = 0; i < tokens.length; i++) {
-    var t = tokens[i];
-    if (/^\d+:\d+$/.test(t)) {
-      time = t;
-    } else if (/^(P[123]|OT|SO)$/i.test(t) && time !== null) {
+  for (var i = 0; i < tokens.length - 1; i++) {
+    if (/^\d+:\d+$/.test(tokens[i]) && /^(P[123]|OT|SO)$/i.test(tokens[i + 1])) {
+      // Skip penalty entries: a penalty code (letter(s)+digits, e.g. "A44") immediately before the time
+      if (i > 0 && /^[A-Za-z]+\d+$/.test(tokens[i - 1])) continue;
+      // Pass 1: contiguous numbers immediately before the time
+      var jerseys = [];
+      for (var j = i - 1; j >= 0; j--) {
+        if (/^\d+$/.test(tokens[j])) {
+          jerseys.unshift(parseInt(tokens[j]));
+        } else {
+          break;
+        }
+      }
+
+      // Pass 2: skip name tokens, but reject roster-entry jerseys
+      if (jerseys.length === 0) {
+        var k = i - 1;
+        while (k >= 0) {
+          if (/^\d+$/.test(tokens[k])) {
+            var num = parseInt(tokens[k]);
+            var nextWord = tokens[k + 1] ? tokens[k + 1].toUpperCase() : null;
+            var isRosterEntry = rosterCtx && nextWord &&
+                                rosterCtx[num] && rosterCtx[num][nextWord];
+            if (isRosterEntry) {
+              k--; // this jersey is immediately followed by its player's name — skip it
+            } else {
+              while (k >= 0 && /^\d+$/.test(tokens[k])) {
+                jerseys.unshift(parseInt(tokens[k--]));
+              }
+              break;
+            }
+          } else if (/^\d+:\d+$/.test(tokens[k])) {
+            break; // hit a previous goal's time — stop
+          } else {
+            k--; // skip name token from other column
+          }
+        }
+      }
+
       if (jerseys.length > 0) {
         goals.push({
           scorer:  jerseys[0],
           assist1: jerseys[1] || null,
           assist2: jerseys[2] || null,
-          time:    time,
-          period:  t.toUpperCase()
+          time:    tokens[i],
+          period:  tokens[i + 1].toUpperCase()
         });
       }
-      jerseys = [];
-      time = null;
-    } else if (/^\d+$/.test(t) && time === null) {
-      jerseys.push(parseInt(t));
     }
   }
   return goals;
