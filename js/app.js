@@ -605,7 +605,11 @@ function renderImportPreview(data) {
     <div style="margin-top:12px">
       <div class="form-label">Attendance (from sheet)</div>
       <div class="text-muted" style="font-size:13px">${attendNames}</div>
-    </div>` : ''}`;
+    </div>` : ''}
+    ${data.debugScoring ? `
+    <hr class="divider">
+    <div class="form-label" style="margin-bottom:4px">Debug — scoring lines</div>
+    <textarea readonly style="width:100%;height:120px;font-size:11px;font-family:monospace;white-space:pre">${escHtml(data.debugScoring)}</textarea>` : ''}`;
 }
 
 function matchRosterEntry(r, roster) {
