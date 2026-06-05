@@ -442,7 +442,13 @@ function saveReflection() {
   if (!game) return;
 
   const text = document.getElementById('reflection-text').value.trim();
+  const result = document.getElementById('result-input').value.trim();
   const statsUrl = document.getElementById('stats-url-input').value.trim();
+
+  if (result) {
+    game.result = result;
+    game.completed = true;
+  }
 
   const lineNoteInputs = document.querySelectorAll('.line-note-input');
   const lineNotes = [];

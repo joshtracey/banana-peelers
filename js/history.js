@@ -195,6 +195,7 @@ const History = {
     const currentText = coach === 'Coach1' ? (game.reflectionCoach1 || '') : (game.reflectionCoach2 || '');
     const currentLineNotes = coach === 'Coach1' ? (game.lineNotesCoach1 || '') : (game.lineNotesCoach2 || '');
     document.getElementById('reflection-text').value = currentText;
+    document.getElementById('result-input').value = game.result || '';
     document.getElementById('stats-url-input').value = game.statsUrl || '';
 
     const lnContainer = document.getElementById('line-notes-container');

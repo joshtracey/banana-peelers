@@ -16,7 +16,7 @@ const DEFAULT_ROSTER = [
 const SCHEDULE = [
   { id: 'g2026-05-26', date: '2026-05-26', opponent: 'Green U11', time: '5:50 PM', venue: 'Indoor',  result: 'W 18–3', completed: true  },
   { id: 'g2026-05-28', date: '2026-05-28', opponent: 'Red U11',   time: '5:50 PM', venue: 'Outdoor', result: 'W 10–3', completed: true  },
-  { id: 'g2026-06-04', date: '2026-06-04', opponent: 'White U11', time: '5:50 PM', venue: 'Outdoor', result: null,     completed: false },
+  { id: 'g2026-06-04', date: '2026-06-04', opponent: 'White U11', time: '5:50 PM', venue: 'Outdoor', result: 'W 8–7', completed: true  },
   { id: 'g2026-06-07', date: '2026-06-07', opponent: 'Gray U11',  time: '4:10 PM', venue: 'Indoor',  result: null,     completed: false },
   { id: 'g2026-06-09', date: '2026-06-09', opponent: 'Green U11', time: '5:50 PM', venue: 'Indoor',  result: null,     completed: false },
   { id: 'g2026-06-11', date: '2026-06-11', opponent: 'Red U11',   time: '5:50 PM', venue: 'Outdoor', result: null,     completed: false },
