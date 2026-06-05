@@ -608,6 +608,14 @@ function renderImportPreview(data) {
       <div class="form-label">Attendance (from sheet)</div>
       <div class="text-muted" style="font-size:13px">${attendNames}</div>
     </div>` : ''}
+    <details style="margin-top:12px;font-size:12px">
+      <summary style="cursor:pointer;color:var(--grey-700)">Debug: raw scoring entries</summary>
+      <div style="font-family:monospace;font-size:11px;margin-top:6px;line-height:1.8">
+        ${(data.scoring || []).map((g, i) =>
+          `#${i+1}: scorer=${g.scorer} a1=${g.assist1} a2=${g.assist2} ${g.time} ${g.period}`
+        ).join('<br>')}
+      </div>
+    </details>
     `;
 }
 
