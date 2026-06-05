@@ -171,13 +171,17 @@ function parseGameSheetText(text, gameNo) {
 
   // Collect our scoring entries
   var scoring = [];
+  var debugScoringLines = [];
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
     var stop = stopIdx >= 0;
     if (stop) sline = sline.slice(0, stopIdx);
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').replace(/#\s*Code\s+Time\s+Per\./i, '').trim();
-    if (sline) scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
+    if (sline) {
+      debugScoringLines.push(sline);
+      scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
+    }
     if (stop) break;
   }
 
@@ -262,7 +266,8 @@ function parseGameSheetText(text, gameNo) {
     roster: roster,
     scoring: scoring,
     playerStats: Object.values(map),
-    totalGoals: scoring.length
+    totalGoals: scoring.length,
+    debugScoringLines: debugScoringLines
   };
 }
 

@@ -609,11 +609,9 @@ function renderImportPreview(data) {
       <div class="text-muted" style="font-size:13px">${attendNames}</div>
     </div>` : ''}
     <div style="margin-top:12px;font-size:11px;color:var(--grey-700)">
-      <div style="font-weight:700;margin-bottom:4px">Raw scoring entries:</div>
-      <div style="font-family:monospace;line-height:1.8">
-        ${(data.scoring || []).map((g, i) =>
-          `#${i+1}: scorer=${g.scorer} a1=${g.assist1} a2=${g.assist2} ${g.time} ${g.period}`
-        ).join('<br>')}
+      <div style="font-weight:700;margin-bottom:4px">Raw lines parsed:</div>
+      <div style="font-family:monospace;line-height:1.8;word-break:break-all">
+        ${(data.debugScoringLines || []).map((l, i) => `${i+1}: ${l}`).join('<br>')}
       </div>
     </div>
     `;
