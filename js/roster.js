@@ -35,7 +35,13 @@ function firstName(player) {
 function getRoster() {
   try {
     const saved = localStorage.getItem('bp_roster');
-    return saved ? JSON.parse(saved) : DEFAULT_ROSTER;
+    if (!saved) return DEFAULT_ROSTER;
+    const roster = JSON.parse(saved);
+    roster.forEach(p => {
+      const def = DEFAULT_ROSTER.find(d => d.id === p.id);
+      if (def && def.preferred && !p.preferred) p.preferred = def.preferred;
+    });
+    return roster;
   } catch (e) { return DEFAULT_ROSTER; }
 }
 

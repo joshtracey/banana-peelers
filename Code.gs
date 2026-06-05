@@ -169,28 +169,33 @@ function parseGameSheetText(text, gameNo) {
     }
   }
 
-  // Collect our scoring entries. A second "G A A Time Per." header appearing within our
-  // range (j > ourHeaderIdx) signals the opponent's scoring section bleeding in from the
-  // adjacent PDF column. We track those lines as opponent content, collect their
-  // (time:period) keys, and switch back to our goals after the shootout name section.
+  // Collect our scoring entries.
+  // The PDF game sheet uses a two-column layout. When extracted as text, the opponent's
+  // scoring entries appear as bare time-bearing lines BEFORE the mixed-case shootout
+  // participant section, while our continuation goals (P3) appear AFTER it.
+  //
+  // Strategy:
+  //   - j == ourHeaderIdx: always our goals (our own header line)
+  //   - j > ourHeaderIdx, hasTime, !pastNameSection: opponent bleed-in → theirGoalTimes
+  //   - j > ourHeaderIdx, !hasTime, hasMixedCaseName: name section → pastNameSection = true
+  //   - j > ourHeaderIdx, hasTime, pastNameSection: our P3 goals → scoring
   var scoring = [];
   var shootoutNameMap = {};
   var theirGoalTimes = {};
   var theirNumbers = {};
-  var inOpponentSection = false;
+  var pastNameSection = false;
   var snRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
     var stop = stopIdx >= 0;
     if (stop) sline = sline.slice(0, stopIdx);
-    if (j > ourHeaderIdx && /G\s+A\s+A\s+Time/i.test(sline)) inOpponentSection = true;
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').replace(/#\s*Code\s+Time\s+Per\./i, '').trim();
     if (sline) {
       var hasTime = /\d+:\d+/.test(sline);
       var hasMixedCaseName = /\d+\s+[A-Z][a-z]+\s+[A-Z][a-z]/.test(sline);
       if (!hasTime && hasMixedCaseName) {
-        inOpponentSection = false; // name section ends the interleaved opponent block
+        pastNameSection = true;
         snRe.lastIndex = 0;
         var snm;
         while ((snm = snRe.exec(sline)) !== null) {
@@ -207,22 +212,22 @@ function parseGameSheetText(text, gameNo) {
         }
       }
       if (hasTime) {
-        if (inOpponentSection) {
+        if (j === ourHeaderIdx || pastNameSection) {
+          scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
+        } else {
           parseScoringFromLine(sline).forEach(function(g) {
             if (g.scorer)  theirNumbers[g.scorer]  = true;
             if (g.assist1) theirNumbers[g.assist1] = true;
             if (g.assist2) theirNumbers[g.assist2] = true;
             if (g.time && g.period) theirGoalTimes[g.time + ':' + g.period] = true;
           });
-        } else {
-          scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
         }
       }
     }
     if (stop) break;
   }
 
-  // Remove any opponent goals that slipped into our scoring list
+  // Safety filter: remove any opponent goals that still ended up in our list
   scoring = scoring.filter(function(g) {
     return !theirGoalTimes[g.time + ':' + g.period];
   });
