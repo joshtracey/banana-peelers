@@ -70,7 +70,7 @@ function ensureSchedule() {
       if (!existing.opponent) existing.opponent = sched.opponent;
       if (!existing.time) existing.time = sched.time;
       if (!existing.venue) existing.venue = sched.venue;
-      if (existing.result === undefined) existing.result = sched.result;
+      if (!existing.result) existing.result = sched.result;
     }
   });
   // Sort by date
