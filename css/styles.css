@@ -1051,3 +1051,112 @@ input, textarea, select { font: inherit; }
   transition: all 0.15s;
 }
 .import-btn:active { background: var(--grey-200); }
+
+/* ── Heatmap tab ── */
+.hm-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 8px;
+}
+.hm-table {
+  border-collapse: collapse;
+}
+.hm-col-header {
+  vertical-align: bottom;
+  padding: 0 2px 4px;
+}
+.hm-col-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--grey-700);
+  max-height: 68px;
+  overflow: hidden;
+}
+.hm-row-header {
+  text-align: right;
+  padding: 2px 6px 2px 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--grey-700);
+  white-space: nowrap;
+}
+.hm-cell {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 9px;
+  font-weight: 800;
+  border: 2px solid var(--white);
+  background: var(--grey-100);
+}
+.hm-diag {
+  background: var(--grey-200) !important;
+}
+.hm-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--grey-700);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.hm-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--grey-200);
+  vertical-align: middle;
+}
+.hm-line-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.hm-line-meta {
+  flex: 1;
+  min-width: 0;
+}
+.hm-line-names {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hm-line-sub {
+  font-size: 11px;
+  color: var(--grey-400);
+}
+.hm-line-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.hm-line-bar-wrap {
+  width: 80px;
+  height: 8px;
+  background: var(--grey-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.hm-line-bar {
+  height: 100%;
+  background: var(--yellow-dark);
+  border-radius: 4px;
+}
+.hm-line-pts {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  white-space: nowrap;
+}

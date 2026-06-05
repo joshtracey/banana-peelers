@@ -283,8 +283,8 @@ function parseScoringFromLine(line, rosterCtx) {
 
   for (var i = 0; i < tokens.length - 1; i++) {
     if (/^\d+:\d+$/.test(tokens[i]) && /^(P[123]|OT|SO)$/i.test(tokens[i + 1])) {
-      // Skip penalty entries: a penalty code (letter(s)+digits, e.g. "A44") immediately before the time
-      if (i > 0 && /^[A-Za-z]+\d+$/.test(tokens[i - 1])) continue;
+      // Skip penalty entries (e.g. "A44") and shootout saves ("Safe") immediately before the time
+      if (i > 0 && (/^[A-Za-z]+\d+$/.test(tokens[i - 1]) || /^safe$/i.test(tokens[i - 1]))) continue;
       // Pass 1: contiguous numbers immediately before the time
       var jerseys = [];
       for (var j = i - 1; j >= 0; j--) {

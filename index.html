@@ -150,6 +150,12 @@
         </div>
       </div>
 
+      <div id="tab-heatmap" class="tab-panel">
+        <div id="heatmap-content">
+          <div class="loading-state">Loading...</div>
+        </div>
+      </div>
+
     </main>
 
     <!-- Bottom navigation -->
@@ -166,6 +172,10 @@
         <span class="nav-icon">👥</span>
         <span class="nav-label">Roster</span>
       </button>
+      <button class="nav-btn" data-tab="heatmap" onclick="switchTab('heatmap')">
+        <span class="nav-icon">🔥</span>
+        <span class="nav-label">Heatmap</span>
+      </button>
     </nav>
 
     <!-- FAB -->
@@ -179,6 +189,7 @@
   <script src="js/roster.js"></script>
   <script src="js/lines.js"></script>
   <script src="js/history.js"></script>
+  <script src="js/heatmap.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

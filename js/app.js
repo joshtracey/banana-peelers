@@ -88,6 +88,7 @@ function switchTab(tab) {
   if (tab === 'today') renderTodayTab();
   if (tab === 'history') History.render();
   if (tab === 'roster') renderRosterTab();
+  if (tab === 'heatmap') Heatmap.render();
 }
 
 // ── Render all ──
@@ -95,6 +96,7 @@ function renderAll() {
   if (STATE.currentTab === 'today') renderTodayTab();
   if (STATE.currentTab === 'history') History.render();
   if (STATE.currentTab === 'roster') renderRosterTab();
+  if (STATE.currentTab === 'heatmap') Heatmap.render();
 }
 
 // ── Today tab ──
