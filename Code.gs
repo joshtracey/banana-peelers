@@ -169,20 +169,14 @@ function parseGameSheetText(text, gameNo) {
     }
   }
 
-  // Collect our scoring entries.
-  // Lines with mixed-case full names but no time tokens (e.g. "93 Max Fleming 97 Theodore Crabbe")
-  // are shootout participant lists — they mark the transition into the shootout section.
-  // In shootout mode we use parseShootoutFromLine which only accepts entries where exactly
-  // one jersey number precedes the time, filtering out interleaved opponent-column data.
-  // shootoutNameMap: jersey → name, built from mixed-case participant lines in the
-  // shootout section. rosterCtx validates known players; for fill-ins (no rosterCtx entry)
-  // we use weAreSecond to decide which occurrence to keep: if we are second in the
-  // document our list appears after the opponent's, so overwriting each time gives the
-  // right result; if we are first, we keep only the first occurrence.
+  // Collect our scoring entries. Mixed-case full-name lines (shootout participant lists)
+  // are used only for fill-in player name resolution via shootoutNameMap — they do not
+  // change the parsing mode. All lines with time tokens use parseScoringFromLine.
+  // Opponent goals that bleed into our section due to PDF two-column layout are removed
+  // afterward using time+period matching against the opponent's scoring section.
   var scoring = [];
   var shootoutNameMap = {};
   var snRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
-  var inShootout = false;
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
@@ -193,7 +187,6 @@ function parseGameSheetText(text, gameNo) {
       var hasTime = /\d+:\d+/.test(sline);
       var hasMixedCaseName = /\d+\s+[A-Z][a-z]+\s+[A-Z][a-z]/.test(sline);
       if (!hasTime && hasMixedCaseName) {
-        inShootout = true;
         snRe.lastIndex = 0;
         var snm;
         while ((snm = snRe.exec(sline)) !== null) {
@@ -201,25 +194,24 @@ function parseGameSheetText(text, gameNo) {
           var snName = snm[2].trim();
           var snFirst = snName.split(' ')[0].toUpperCase();
           if (rosterCtx[snNum] && rosterCtx[snNum][snFirst]) {
-            shootoutNameMap[snNum] = snName; // confirmed our player
+            shootoutNameMap[snNum] = snName;
           } else if (!rosterCtx[snNum]) {
-            // fill-in: overwrite if we're second (our list comes later); keep first if we're first
             if (weAreSecond || !shootoutNameMap.hasOwnProperty(snNum)) {
               shootoutNameMap[snNum] = snName;
             }
           }
-          // rosterCtx[snNum] exists but name doesn't match → opponent player, skip
         }
-      } else if (hasTime) {
-        scoring = scoring.concat(
-          inShootout ? parseShootoutFromLine(sline) : parseScoringFromLine(sline, rosterCtx)
-        );
+      }
+      if (hasTime) {
+        scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
       }
     }
     if (stop) break;
   }
 
-  // Collect opponent scoring numbers (to identify which numbers are exclusive to us)
+  // Collect opponent scoring entries: numbers for ourNumbers disambiguation, and
+  // time+period keys to strip opponent goals that bled into our scoring section.
+  var theirGoalTimes = {};
   var theirNumbers = {};
   if (theirHeaderIdx >= 0) {
     for (var tj = theirHeaderIdx; tj < allLines.length; tj++) {
@@ -230,9 +222,15 @@ function parseGameSheetText(text, gameNo) {
         if (g.scorer)  theirNumbers[g.scorer]  = true;
         if (g.assist1) theirNumbers[g.assist1] = true;
         if (g.assist2) theirNumbers[g.assist2] = true;
+        if (g.time && g.period) theirGoalTimes[g.time + ':' + g.period] = true;
       });
     }
   }
+
+  // Remove opponent goals that appeared in our section due to PDF column interleaving
+  scoring = scoring.filter(function(g) {
+    return !theirGoalTimes[g.time + ':' + g.period];
+  });
 
   // Numbers that appeared in our scoring
   var ourNumbers = {};
@@ -305,31 +303,6 @@ function parseGameSheetText(text, gameNo) {
     playerStats: Object.values(map),
     totalGoals: scoring.length
   };
-}
-
-function parseShootoutFromLine(line) {
-  // Only count shootout entries where exactly one jersey number immediately precedes
-  // the time anchor. Entries with two or more numbers before the time are interleaved
-  // opponent-column data from the PDF table layout and should not be counted as goals.
-  var goals = [];
-  var tokens = line.trim().split(/\s+/);
-  for (var i = 0; i < tokens.length - 1; i++) {
-    if (/^\d+:\d+$/.test(tokens[i]) && /^(P[123]|OT|SO)$/i.test(tokens[i + 1])) {
-      if (i > 0 && /^[A-Za-z]+\d+$/.test(tokens[i - 1])) continue; // penalty code
-      var prevIsNum  = i >= 1 && /^\d+$/.test(tokens[i - 1]);
-      var prev2IsNum = i >= 2 && /^\d+$/.test(tokens[i - 2]);
-      if (prevIsNum && !prev2IsNum) {
-        goals.push({
-          scorer:  parseInt(tokens[i - 1]),
-          assist1: null,
-          assist2: null,
-          time:    tokens[i],
-          period:  tokens[i + 1].toUpperCase()
-        });
-      }
-    }
-  }
-  return goals;
 }
 
 function parseScoringFromLine(line, rosterCtx) {
