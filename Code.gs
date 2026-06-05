@@ -169,24 +169,28 @@ function parseGameSheetText(text, gameNo) {
     }
   }
 
-  // Collect our scoring entries. Mixed-case full-name lines (shootout participant lists)
-  // are used only for fill-in player name resolution via shootoutNameMap — they do not
-  // change the parsing mode. All lines with time tokens use parseScoringFromLine.
-  // Opponent goals that bleed into our section due to PDF two-column layout are removed
-  // afterward using time+period matching against the opponent's scoring section.
+  // Collect our scoring entries. A second "G A A Time Per." header appearing within our
+  // range (j > ourHeaderIdx) signals the opponent's scoring section bleeding in from the
+  // adjacent PDF column. We track those lines as opponent content, collect their
+  // (time:period) keys, and switch back to our goals after the shootout name section.
   var scoring = [];
   var shootoutNameMap = {};
+  var theirGoalTimes = {};
+  var theirNumbers = {};
+  var inOpponentSection = false;
   var snRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
     var stop = stopIdx >= 0;
     if (stop) sline = sline.slice(0, stopIdx);
+    if (j > ourHeaderIdx && /G\s+A\s+A\s+Time/i.test(sline)) inOpponentSection = true;
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').replace(/#\s*Code\s+Time\s+Per\./i, '').trim();
     if (sline) {
       var hasTime = /\d+:\d+/.test(sline);
       var hasMixedCaseName = /\d+\s+[A-Z][a-z]+\s+[A-Z][a-z]/.test(sline);
       if (!hasTime && hasMixedCaseName) {
+        inOpponentSection = false; // name section ends the interleaved opponent block
         snRe.lastIndex = 0;
         var snm;
         while ((snm = snRe.exec(sline)) !== null) {
@@ -203,31 +207,22 @@ function parseGameSheetText(text, gameNo) {
         }
       }
       if (hasTime) {
-        scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
+        if (inOpponentSection) {
+          parseScoringFromLine(sline).forEach(function(g) {
+            if (g.scorer)  theirNumbers[g.scorer]  = true;
+            if (g.assist1) theirNumbers[g.assist1] = true;
+            if (g.assist2) theirNumbers[g.assist2] = true;
+            if (g.time && g.period) theirGoalTimes[g.time + ':' + g.period] = true;
+          });
+        } else {
+          scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
+        }
       }
     }
     if (stop) break;
   }
 
-  // Collect opponent scoring entries: numbers for ourNumbers disambiguation, and
-  // time+period keys to strip opponent goals that bled into our scoring section.
-  var theirGoalTimes = {};
-  var theirNumbers = {};
-  if (theirHeaderIdx >= 0) {
-    for (var tj = theirHeaderIdx; tj < allLines.length; tj++) {
-      var tline = allLines[tj];
-      if (/Franc jeu|Goaltender|Shootout/i.test(tline)) break;
-      tline = tline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').trim();
-      parseScoringFromLine(tline).forEach(function(g) {
-        if (g.scorer)  theirNumbers[g.scorer]  = true;
-        if (g.assist1) theirNumbers[g.assist1] = true;
-        if (g.assist2) theirNumbers[g.assist2] = true;
-        if (g.time && g.period) theirGoalTimes[g.time + ':' + g.period] = true;
-      });
-    }
-  }
-
-  // Remove opponent goals that appeared in our section due to PDF column interleaving
+  // Remove any opponent goals that slipped into our scoring list
   scoring = scoring.filter(function(g) {
     return !theirGoalTimes[g.time + ':' + g.period];
   });
