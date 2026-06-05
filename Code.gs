@@ -174,7 +174,14 @@ function parseGameSheetText(text, gameNo) {
   // are shootout participant lists — they mark the transition into the shootout section.
   // In shootout mode we use parseShootoutFromLine which only accepts entries where exactly
   // one jersey number precedes the time, filtering out interleaved opponent-column data.
+  // shootoutNameMap: jersey → name, built from mixed-case participant lines in the
+  // shootout section. rosterCtx validates known players; for fill-ins (no rosterCtx entry)
+  // we use weAreSecond to decide which occurrence to keep: if we are second in the
+  // document our list appears after the opponent's, so overwriting each time gives the
+  // right result; if we are first, we keep only the first occurrence.
   var scoring = [];
+  var shootoutNameMap = {};
+  var snRe = /\b(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/g;
   var inShootout = false;
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
@@ -187,6 +194,22 @@ function parseGameSheetText(text, gameNo) {
       var hasMixedCaseName = /\d+\s+[A-Z][a-z]+\s+[A-Z][a-z]/.test(sline);
       if (!hasTime && hasMixedCaseName) {
         inShootout = true;
+        snRe.lastIndex = 0;
+        var snm;
+        while ((snm = snRe.exec(sline)) !== null) {
+          var snNum = parseInt(snm[1]);
+          var snName = snm[2].trim();
+          var snFirst = snName.split(' ')[0].toUpperCase();
+          if (rosterCtx[snNum] && rosterCtx[snNum][snFirst]) {
+            shootoutNameMap[snNum] = snName; // confirmed our player
+          } else if (!rosterCtx[snNum]) {
+            // fill-in: overwrite if we're second (our list comes later); keep first if we're first
+            if (weAreSecond || !shootoutNameMap.hasOwnProperty(snNum)) {
+              shootoutNameMap[snNum] = snName;
+            }
+          }
+          // rosterCtx[snNum] exists but name doesn't match → opponent player, skip
+        }
       } else if (hasTime) {
         scoring = scoring.concat(
           inShootout ? parseShootoutFromLine(sline) : parseScoringFromLine(sline, rosterCtx)
@@ -237,10 +260,10 @@ function parseGameSheetText(text, gameNo) {
     }
   }
 
-  // Scoring participants not found on any roster line get a number-only fallback
+  // Scoring participants not found on any roster line: use shootout participant name if available
   Object.keys(ourNumbers).forEach(function(n) {
     var num = parseInt(n);
-    if (!seenOnRosterLine[num]) rosterEntries.push({ number: num, name: null });
+    if (!seenOnRosterLine[num]) rosterEntries.push({ number: num, name: shootoutNameMap[num] || null });
   });
 
   // Detect goalie via "Name (#number)" pattern (one entry per team in the document)
