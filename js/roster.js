@@ -1,15 +1,15 @@
 const DEFAULT_ROSTER = [
   { id: 'p86', number: 86, name: 'Max Fleming',     position: 'F' },
   { id: 'p63', number: 63, name: 'Jaxson Leaman',   position: 'F' },
-  { id: 'p97', number: 97, name: 'Theodore Crabbe', position: 'F' },
-  { id: 'p87', number: 87, name: 'Theo Tracey',     position: 'F' },
+  { id: 'p97', number: 97, name: 'Theodore Crabbe', position: 'F', preferred: 'Theo C' },
+  { id: 'p87', number: 87, name: 'Theo Tracey',     position: 'F', preferred: 'Theo T' },
   { id: 'p71', number: 71, name: 'Norah Stevens',   position: 'F' },
   { id: 'p22', number: 22, name: 'Crawford Smith',  position: 'F' },
   { id: 'p73', number: 73, name: 'Grayson Conn',    position: 'D' },
   { id: 'p48', number: 48, name: 'Noah Watson',     position: 'D' },
   { id: 'p11', number: 11, name: 'Addison Train',   position: 'D' },
   { id: 'p10', number: 10, name: 'Adam Vyselaar',   position: 'D' },
-  { id: 'p21', number: 21, name: 'August Crabbe',   position: 'D' },
+  { id: 'p21', number: 21, name: 'August Crabbe',   position: 'D', preferred: 'Gus' },
   { id: 'goalie', number: null, name: 'Evan Crawford', position: 'G' }
 ];
 
@@ -27,6 +27,10 @@ const SCHEDULE = [
   { id: 'g2026-06-30', date: '2026-06-30', opponent: 'Gray U11',  time: '5:50 PM', venue: 'Outdoor', result: null,     completed: false },
   { id: 'g2026-07-05', date: '2026-07-05', opponent: 'Gray U11',  time: '4:10 PM', venue: 'Indoor',  result: null,     completed: false }
 ];
+
+function firstName(player) {
+  return player.preferred || player.name.split(' ')[0];
+}
 
 function getRoster() {
   try {

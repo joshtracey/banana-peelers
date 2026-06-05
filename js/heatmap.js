@@ -16,14 +16,14 @@ const Heatmap = {
 function hmAbbrev(players) {
   const firstCount = {};
   players.forEach(p => {
-    const f = p.name.split(' ')[0];
+    const f = firstName(p);
     firstCount[f] = (firstCount[f] || 0) + 1;
   });
   const out = {};
   players.forEach(p => {
+    const f = firstName(p);
     const parts = p.name.split(' ');
-    const first = parts[0];
-    out[p.id] = firstCount[first] > 1 ? first + ' ' + parts[parts.length - 1][0] : first;
+    out[p.id] = firstCount[f] > 1 ? f + ' ' + parts[parts.length - 1][0] : f;
   });
   return out;
 }
@@ -131,7 +131,7 @@ function hmRenderLines(games, roster) {
   const rows = lines.map(entry => {
     const names = entry.members.map(id => {
       const p = roster.find(r => r.id === id);
-      return p ? p.name.split(' ')[0] : id;
+      return p ? firstName(p) : id;
     }).join(', ');
     const w = Math.round((entry.pts / maxPts) * 100);
     const gLabel = entry.games === 1 ? '1 game' : `${entry.games} games`;

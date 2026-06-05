@@ -217,7 +217,7 @@ function renderGameManagement(game) {
       <div class="attendance-chip ${present ? 'present' : 'absent'}"
         onclick="toggleAttendance('${game.id}', '${p.id}')">
         <span class="chip-number">#${p.number}</span>
-        ${p.name.split(' ')[0]}
+        ${firstName(p)}
         <span class="chip-pos">${p.position}</span>
       </div>`;
   }).join('');
@@ -513,8 +513,8 @@ function renderStatsTable(game) {
       const player = roster.find(p => p.number === s.number);
       const nameParts = player ? player.name.split(' ') : [];
       const name = player
-        ? nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : '')
-        : '#' + s.number;
+        ? (player.preferred || nameParts[0] + (nameParts[1] ? ' ' + nameParts[1][0] + '.' : ''))
+        : (s.name || '#' + s.number);
       return `<tr>
         <td>${name}</td>
         <td>${s.g}</td>
@@ -578,7 +578,7 @@ function renderImportPreview(data) {
     .sort((a, b) => b.pts - a.pts || b.g - a.g)
     .map(s => {
       const player = roster.find(p => p.number === s.number);
-      const name = player ? player.name : (s.name || '#' + s.number);
+      const name = player ? (player.preferred || player.name) : (s.name || '#' + s.number);
       return `<tr>
         <td>${name}</td>
         <td>${s.g}</td>
@@ -591,7 +591,7 @@ function renderImportPreview(data) {
   const attendNames = (data.roster || [])
     .map(r => matchRosterEntry(r, roster))
     .filter(p => p && !seenPreviewIds.has(p.id) && seenPreviewIds.add(p.id))
-    .map(p => p.name.split(' ')[0])
+    .map(p => firstName(p))
     .join(', ');
 
   document.getElementById('import-results').innerHTML = `

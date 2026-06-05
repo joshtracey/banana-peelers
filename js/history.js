@@ -21,7 +21,7 @@ const History = {
         ${skaters.map(p => `
           <button class="filter-chip ${this.filterPlayerId === p.id ? 'active' : ''}"
             onclick="History.setFilter('${p.id}')">
-            ${p.name.split(' ')[0]}
+            ${firstName(p)}
           </button>`).join('')}
       </div>`;
 
@@ -82,7 +82,7 @@ const History = {
     if (game.attendance && game.attendance.length > 0) {
       const names = game.attendance.map(id => {
         const p = roster.find(r => r.id === id);
-        return p ? p.name.split(' ')[0] : id;
+        return p ? firstName(p) : id;
       }).join(', ');
       html += `
         <div class="section-title" style="margin-bottom:4px">Attendance (${game.attendance.length})</div>
@@ -99,11 +99,11 @@ const History = {
       game.lines.forEach((line, idx) => {
         const forwards = line.forwards.filter(Boolean).map(id => {
           const p = roster.find(r => r.id === id);
-          return p ? `<span class="history-player-tag f">${p.name.split(' ')[0]}</span>` : '';
+          return p ? `<span class="history-player-tag f">${firstName(p)}</span>` : '';
         }).join('');
         const defence = line.defence.filter(Boolean).map(id => {
           const p = roster.find(r => r.id === id);
-          return p ? `<span class="history-player-tag d">${p.name.split(' ')[0]}</span>` : '';
+          return p ? `<span class="history-player-tag d">${firstName(p)}</span>` : '';
         }).join('');
         if (!forwards && !defence) return;
         html += `
