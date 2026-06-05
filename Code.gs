@@ -169,9 +169,13 @@ function parseGameSheetText(text, gameNo) {
     }
   }
 
-  // Collect our scoring entries
+  // Collect our scoring entries.
+  // Lines with mixed-case full names but no time tokens (e.g. "93 Max Fleming 97 Theodore Crabbe")
+  // are shootout participant lists — they mark the transition into the shootout section.
+  // In shootout mode we use parseShootoutFromLine which only accepts entries where exactly
+  // one jersey number precedes the time, filtering out interleaved opponent-column data.
   var scoring = [];
-  var debugScoringLines = [];
+  var inShootout = false;
   for (var j = ourHeaderIdx; j < allLines.length; j++) {
     var sline = allLines[j];
     var stopIdx = sline.search(/Franc jeu|Goaltender|Shootout/i);
@@ -179,8 +183,15 @@ function parseGameSheetText(text, gameNo) {
     if (stop) sline = sline.slice(0, stopIdx);
     sline = sline.replace(/G\s+A\s+A\s+Time\s+Per\./i, '').replace(/#\s*Code\s+Time\s+Per\./i, '').trim();
     if (sline) {
-      debugScoringLines.push(sline);
-      scoring = scoring.concat(parseScoringFromLine(sline, rosterCtx));
+      var hasTime = /\d+:\d+/.test(sline);
+      var hasMixedCaseName = /\d+\s+[A-Z][a-z]+\s+[A-Z][a-z]/.test(sline);
+      if (!hasTime && hasMixedCaseName) {
+        inShootout = true;
+      } else if (hasTime) {
+        scoring = scoring.concat(
+          inShootout ? parseShootoutFromLine(sline) : parseScoringFromLine(sline, rosterCtx)
+        );
+      }
     }
     if (stop) break;
   }
@@ -266,9 +277,33 @@ function parseGameSheetText(text, gameNo) {
     roster: roster,
     scoring: scoring,
     playerStats: Object.values(map),
-    totalGoals: scoring.length,
-    debugScoringLines: debugScoringLines
+    totalGoals: scoring.length
   };
+}
+
+function parseShootoutFromLine(line) {
+  // Only count shootout entries where exactly one jersey number immediately precedes
+  // the time anchor. Entries with two or more numbers before the time are interleaved
+  // opponent-column data from the PDF table layout and should not be counted as goals.
+  var goals = [];
+  var tokens = line.trim().split(/\s+/);
+  for (var i = 0; i < tokens.length - 1; i++) {
+    if (/^\d+:\d+$/.test(tokens[i]) && /^(P[123]|OT|SO)$/i.test(tokens[i + 1])) {
+      if (i > 0 && /^[A-Za-z]+\d+$/.test(tokens[i - 1])) continue; // penalty code
+      var prevIsNum  = i >= 1 && /^\d+$/.test(tokens[i - 1]);
+      var prev2IsNum = i >= 2 && /^\d+$/.test(tokens[i - 2]);
+      if (prevIsNum && !prev2IsNum) {
+        goals.push({
+          scorer:  parseInt(tokens[i - 1]),
+          assist1: null,
+          assist2: null,
+          time:    tokens[i],
+          period:  tokens[i + 1].toUpperCase()
+        });
+      }
+    }
+  }
+  return goals;
 }
 
 function parseScoringFromLine(line, rosterCtx) {
