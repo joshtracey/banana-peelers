@@ -262,7 +262,10 @@ function parseGameSheetText(text, gameNo) {
   var map = {};
   function add(num, field) {
     if (!num) return;
-    if (!map[num]) map[num] = { number: num, g: 0, a: 0, pts: 0 };
+    if (!map[num]) {
+      var re = rosterEntries.find(function(r) { return r.number === num; });
+      map[num] = { number: num, name: re ? re.name : null, g: 0, a: 0, pts: 0 };
+    }
     map[num][field]++;
     map[num].pts++;
   }
